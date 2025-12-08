@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitest/config';
-import path from 'path';
+import * as path from 'path';
 
 export default defineConfig({
 	test: {
@@ -11,6 +11,12 @@ export default defineConfig({
 		include: [
 			'src/**/*.{test,spec}.ts',
 			'tests/**/*.{test,spec}.ts'
+		],
+
+		// Exclude integration tests (run separately)
+		exclude: [
+			'**/node_modules/**',
+			'tests/integration/**'
 		],
 
 		// Timeout for async operations

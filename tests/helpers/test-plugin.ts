@@ -1,12 +1,12 @@
 import { vi } from 'vitest';
 import { createTestPlugin } from '../fixtures/plugin';
-import type { IntuitionSettings } from '../../src/types/settings';
+import type { IntuitionPluginSettings } from '../../src/types/settings';
 
 /**
  * Creates a fully initialized test plugin instance
  * Useful for integration tests that need a complete plugin setup
  */
-export async function createIntegrationTestPlugin(settings: Partial<IntuitionSettings> = {}) {
+export async function createIntegrationTestPlugin(settings: Partial<IntuitionPluginSettings> = {}) {
 	const { plugin, app, manifest } = createTestPlugin(settings);
 
 	// Initialize plugin (call onload)

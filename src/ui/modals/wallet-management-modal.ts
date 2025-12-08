@@ -11,8 +11,8 @@ import { NETWORKS } from '../../types/networks';
  */
 export class WalletManagementModal extends Modal {
 	plugin: IntuitionPlugin;
-	private revealPassword: string = '';
-	private showingPrivateKey: boolean = false;
+	private revealPassword = '';
+	private showingPrivateKey = false;
 
 	constructor(app: App, plugin: IntuitionPlugin) {
 		super(app);

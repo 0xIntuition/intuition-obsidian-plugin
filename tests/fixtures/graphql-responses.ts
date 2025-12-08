@@ -4,46 +4,42 @@ import type { AtomData, TripleData } from '../../src/types/intuition';
 // Mock GraphQL Atoms
 export const MOCK_GRAPHQL_ATOM_PERSON: GraphQLAtom = {
 	term_id: '1',
-	vault_id: '100',
 	label: 'Alice',
 	emoji: '👤',
-	atom_type: 'Person',
+	type: 'Person',
 	image: null,
 	creator_id: '0x1234567890123456789012345678901234567890',
-	block_timestamp: '1640000000',
+	created_at: '2021-12-20T13:06:40Z',
 };
 
 export const MOCK_GRAPHQL_ATOM_THING: GraphQLAtom = {
 	term_id: '2',
-	vault_id: '101',
 	label: 'Blockchain',
 	emoji: '⛓️',
-	atom_type: 'Thing',
+	type: 'Thing',
 	image: null,
 	creator_id: '0x1234567890123456789012345678901234567890',
-	block_timestamp: '1640000100',
+	created_at: '2021-12-20T13:08:20Z',
 };
 
 export const MOCK_GRAPHQL_ATOM_BOOK: GraphQLAtom = {
 	term_id: '3',
-	vault_id: '102',
 	label: 'The Great Gatsby',
 	emoji: '📚',
-	atom_type: 'Book',
+	type: 'Book',
 	image: 'https://example.com/gatsby.jpg',
 	creator_id: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
-	block_timestamp: '1640000200',
+	created_at: '2021-12-20T13:10:00Z',
 };
 
 export const MOCK_GRAPHQL_ATOM_PREDICATE: GraphQLAtom = {
 	term_id: '4',
-	vault_id: '103',
 	label: 'likes',
 	emoji: '❤️',
-	atom_type: 'Thing',
+	type: 'Thing',
 	image: null,
 	creator_id: '0x1234567890123456789012345678901234567890',
-	block_timestamp: '1640000300',
+	created_at: '2021-12-20T13:11:40Z',
 };
 
 // Mock GraphQL Triples
@@ -183,13 +179,12 @@ export const MOCK_EMPTY_SEARCH_RESPONSE: GraphQLResponse<{
 // Transformed mock data (camelCase, for use with services)
 export const MOCK_ATOM_DATA: AtomData = {
 	id: '1',
-	vaultId: '100',
 	label: 'Alice',
 	emoji: '👤',
 	type: 'Person' as any,
 	image: null,
 	creatorId: '0x1234567890123456789012345678901234567890',
-	blockTimestamp: 1640000000,
+	createdAt: new Date('2021-12-20T13:06:40Z').getTime(),
 };
 
 export const MOCK_TRIPLE_DATA: TripleData = {

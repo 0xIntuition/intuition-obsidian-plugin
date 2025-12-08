@@ -68,7 +68,7 @@ describe('deepMergeSettings', () => {
 			cacheSettings: {
 				ttl: 600000,
 			},
-		};
+		} as any;
 
 		const result = deepMergeSettings(defaults, saved);
 
@@ -87,7 +87,7 @@ describe('deepMergeSettings', () => {
 		const saved = {
 			network: 'base-sepolia',
 			rpcUrl: null,
-		};
+		} as any;
 
 		const result = deepMergeSettings(defaults, saved);
 
@@ -131,7 +131,7 @@ describe('deepMergeSettings', () => {
 					},
 				},
 			},
-		};
+		} as any;
 
 		const result = deepMergeSettings(defaults, saved);
 

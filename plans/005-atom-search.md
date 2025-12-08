@@ -1,7 +1,13 @@
 # Plan 005: Atom Search & Selection
 
 ## Objective
-Build a reusable atom search and selection component with autocomplete, fuzzy matching, and the ability to indicate new atom creation.
+Build a reusable atom search and selection component with autocomplete, fuzzy matching, semantic search, and the ability to indicate new atom creation.
+
+## Key Features
+- **Dual Search Strategy**: Combines semantic (AI-powered) and label-based search for optimal results
+- **Intelligent Ranking**: Merges and ranks results based on relevance, exact matches, and fuzzy matching
+- **Rich Metadata**: Displays descriptions, types, and trust indicators
+- **Real-time Search**: Debounced search with loading states
 
 ## Prerequisites
 - Plan 004 (Intuition SDK Integration)
@@ -22,12 +28,13 @@ src/
   ui/
     components/
       atom-search-input.ts   # Main search component
-      atom-suggestion.ts     # Suggestion item
-      atom-preview.ts        # Selected atom preview
   utils/
     fuzzy-match.ts           # Fuzzy matching utility
     debounce.ts              # Debounce utility
+    search-helpers.ts        # Search result merging and ranking
 ```
+
+**Note**: `atom-suggestion.ts` and `atom-preview.ts` were implemented inline within `atom-search-input.ts` for simplicity.
 
 ## Data Models
 
@@ -170,6 +177,76 @@ export function sortByFuzzyScore<T>(
 }
 ```
 
+### Search Helpers (src/utils/search-helpers.ts)
+
+```typescript
+import { AtomData } from '../types';
+import { fuzzyMatch } from './fuzzy-match';
+
+export interface ScoredAtom {
+  item: AtomData;
+  score: number;
+}
+
+/**
+ * Merges semantic and label search results, deduplicates, and ranks by relevance
+ *
+ * Ranking priority:
+ * 1. Exact label match → score 1.0
+ * 2. Semantic search results → score 0.8
+ * 3. Fuzzy label matches → score 0.3-0.7
+ * 4. Timestamp tiebreaker → newer first
+ */
+export function mergeSearchResults(
+  semanticResults: AtomData[],
+  labelResults: AtomData[],
+  query: string
+): ScoredAtom[] {
+  const queryLower = query.toLowerCase();
+  const atomMap = new Map<string, ScoredAtom>();
+
+  // Process semantic results (score: 0.8 by default)
+  for (const atom of semanticResults) {
+    const exactMatch = atom.label.toLowerCase() === queryLower;
+    const score = exactMatch ? 1.0 : 0.8;
+    atomMap.set(atom.id, { item: atom, score });
+  }
+
+  // Process label results with fuzzy matching
+  for (const atom of labelResults) {
+    const existing = atomMap.get(atom.id);
+
+    // Check for exact match first
+    if (atom.label.toLowerCase() === queryLower) {
+      if (!existing || existing.score < 1.0) {
+        atomMap.set(atom.id, { item: atom, score: 1.0 });
+      }
+      continue;
+    }
+
+    // Use fuzzy matching for scoring
+    const fuzzyResult = fuzzyMatch(query, atom.label);
+    const score = fuzzyResult?.score || 0;
+
+    // Only add/update if this is a better score
+    if (!existing || existing.score < score) {
+      atomMap.set(atom.id, { item: atom, score });
+    }
+  }
+
+  // Convert to array and sort
+  const results = Array.from(atomMap.values());
+  return results.sort((a, b) => {
+    // Primary sort: score (descending)
+    if (a.score !== b.score) {
+      return b.score - a.score;
+    }
+    // Tiebreaker: timestamp (newer first)
+    return b.item.blockTimestamp - a.item.blockTimestamp;
+  });
+}
+```
+
 ### Atom Search Input (src/ui/components/atom-search-input.ts)
 
 ```typescript
@@ -177,7 +254,7 @@ import { AtomData } from '../../types/intuition';
 import { AtomReference, SearchState, AtomSearchConfig, DEFAULT_SEARCH_CONFIG } from '../../types/search';
 import { IntuitionService } from '../../services/intuition-service';
 import { debounce } from '../../utils/debounce';
-import { sortByFuzzyScore } from '../../utils/fuzzy-match';
+import { mergeSearchResults } from '../../utils/search-helpers';
 
 export class AtomSearchInput {
   private container: HTMLElement;
@@ -262,19 +339,20 @@ export class AtomSearchInput {
 
   private async performSearch(query: string): Promise<void> {
     try {
-      const response = await this.intuitionService.searchAtoms({
-        query,
-        limit: this.config.maxResults,
-      });
+      // Run both searches in parallel for better performance
+      const [semanticResults, labelResults] = await Promise.allSettled([
+        this.intuitionService.semanticSearchAtoms(query, this.config.maxResults),
+        this.intuitionService.searchAtoms({ label: query, limit: this.config.maxResults }),
+      ]);
 
-      // Apply fuzzy matching to improve ranking
-      const sorted = sortByFuzzyScore(
-        response.items,
-        query,
-        (atom) => atom.label
-      );
+      // Extract successful results
+      const semantic = semanticResults.status === 'fulfilled' ? semanticResults.value : [];
+      const label = labelResults.status === 'fulfilled' ? labelResults.value : [];
 
-      this.state.results = sorted.map(s => s.item);
+      // Merge and rank using intelligent scoring
+      const merged = mergeSearchResults(semantic, label, query);
+
+      this.state.results = merged.slice(0, this.config.maxResults).map(r => r.item);
       this.state.selectedIndex = 0;
       this.state.isSearching = false;
       this.state.error = null;
@@ -580,6 +658,16 @@ export class AtomSearchInput {
   color: var(--text-muted);
 }
 
+.intuition-atom-suggestion .suggestion-description {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .intuition-atom-suggestion.create-new {
   border-top: 1px solid var(--background-modifier-border);
   color: var(--text-accent);
@@ -617,25 +705,84 @@ export class AtomSearchInput {
 ```
 
 ## Acceptance Criteria
-- [ ] Search input shows loading state during query
-- [ ] Results appear within 300ms of typing stop
-- [ ] Fuzzy matching ranks exact matches higher
-- [ ] Arrow keys navigate suggestions
-- [ ] Enter selects highlighted suggestion
-- [ ] "Create new" option appears for no-match queries
-- [ ] Selected atom shows preview with type/stats
-- [ ] Clear button resets selection
-- [ ] Keyboard navigation is smooth
-- [ ] Component is reusable across modals
+- [x] Search input shows loading state during query
+- [x] Results appear within 300ms of typing stop
+- [x] Dual search strategy runs semantic and label searches in parallel
+- [x] Intelligent ranking merges results with proper scoring
+- [x] Exact matches receive highest priority (score 1.0)
+- [x] Semantic results score 0.8, fuzzy matches 0.3-0.7
+- [x] Descriptions from semantic search are displayed
+- [x] Arrow keys navigate suggestions
+- [x] Enter selects highlighted suggestion
+- [x] "Create new" option appears for no-match queries
+- [x] Selected atom shows preview with type/stats/description
+- [x] Clear button resets selection
+- [x] Keyboard navigation is smooth
+- [x] Component is reusable across modals
 
 ## Testing
-1. Type "Ethereum" - verify results appear
-2. Type partial "Eth" - verify fuzzy matching works
-3. Use arrow keys - verify navigation
-4. Press Enter - verify selection
-5. Select atom - verify preview shows
-6. Click clear - verify input resets
-7. Type unknown term - verify "Create new" appears
+
+### Manual Testing
+1. **Exact Match**: Type "Ethereum" - verify exact matches appear first
+2. **Fuzzy Match**: Type partial "Eth" - verify fuzzy matching works
+3. **Semantic Search**: Type conceptual query "digital currency" - verify semantic results appear
+4. **Dual Search**: Type "blockchain" - verify results from both search strategies are merged
+5. **Navigation**: Use arrow keys - verify keyboard navigation works
+6. **Selection**: Press Enter - verify selection and preview
+7. **Descriptions**: Verify semantic search results show descriptions
+8. **Create New**: Type unknown term - verify "Create new" option appears
+9. **Clear**: Click clear button - verify input resets
+
+### Automated Testing
+- ✅ Debounce utility tests (7 tests)
+- ✅ Fuzzy matching tests (21 tests)
+- Unit tests for `mergeSearchResults` helper (recommended)
+
+## Implementation Details
+
+### Semantic Search
+The semantic search feature uses Intuition's AI-powered `search_term` GraphQL endpoint to find atoms based on meaning and context, not just exact label matches.
+
+**GraphQL Query** (in `intuition-service.ts`):
+```graphql
+query SemanticAtomSearch($query: String, $limit: Int) {
+  search_term(args: {query: $query}, limit: $limit) {
+    atom {
+      term_id
+      vault_id
+      label
+      emoji
+      atom_type
+      image
+      creator_id
+      block_timestamp
+      cached_image {
+        url
+        safe
+      }
+      value {
+        json_object {
+          description: data(path: "description")
+        }
+      }
+    }
+  }
+}
+```
+
+**Key Features**:
+- Returns atoms semantically related to query
+- Includes descriptions from atom metadata
+- Cached with `searchTTL` (default 10 minutes)
+- Runs in parallel with label-based search
+
+### Search Strategy
+The dual search approach ensures:
+1. **Semantic relevance**: Finds conceptually related atoms (e.g., "digital currency" → "Bitcoin")
+2. **Exact matches**: Prioritizes direct label matches
+3. **Fuzzy tolerance**: Handles typos and partial matches
+4. **Performance**: Parallel execution with `Promise.allSettled`
+5. **Resilience**: One search can fail without breaking the other
 
 ## Estimated Effort
-Medium - UI component with search integration
+Medium - UI component with dual search integration ✅ **COMPLETED**

@@ -1,6 +1,7 @@
 import { Component } from 'obsidian';
 import type IntuitionPlugin from '../../main';
 import { truncateAddress } from '../../utils/helpers';
+import { WalletManagementModal } from '../modals/wallet-management-modal';
 
 /**
  * WalletStatusBar - Status bar widget showing wallet state
@@ -25,7 +26,6 @@ export class WalletStatusBar extends Component {
 
 		// Click to open management modal
 		this.statusBarItem.onclick = () => {
-			const { WalletManagementModal } = require('../modals/wallet-management-modal');
 			new WalletManagementModal(
 				this.plugin.app,
 				this.plugin
