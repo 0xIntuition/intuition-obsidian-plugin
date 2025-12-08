@@ -47,3 +47,13 @@ export const DEFAULT_SEARCH_CONFIG: AtomSearchConfig = {
 	maxResults: 10,
 	debounceMs: 300,
 };
+
+/**
+ * UI timing constants for search component
+ */
+export const SEARCH_UI_TIMING = {
+	/** Delay before hiding dropdown on blur to allow dropdown clicks */
+	BLUR_DELAY_MS: 200,
+	/** Maximum allowed search query length to prevent injection attacks */
+	MAX_QUERY_LENGTH: 200,
+} as const;

@@ -8,10 +8,13 @@ import {
 	SearchState,
 	AtomSearchConfig,
 	DEFAULT_SEARCH_CONFIG,
+	AtomData,
+	SEARCH_UI_TIMING,
 } from '../../types';
 import { IntuitionService } from '../../services/intuition-service';
-import { debounce } from '../../utils/debounce';
+import { debounce, DebouncedFunction } from '../../utils/debounce';
 import { mergeSearchResults } from '../../utils/search-helpers';
+import { setImageSrc, validateSearchQuery } from '../../utils/helpers';
 
 export class AtomSearchInput {
 	private container: HTMLElement;
@@ -22,7 +25,11 @@ export class AtomSearchInput {
 	private config: AtomSearchConfig;
 	private state: SearchState;
 	private onSelect: (atom: AtomReference | null) => void;
-	private debouncedSearch: (query: string) => void;
+	private debouncedSearch: DebouncedFunction<(query: string) => void>;
+	private abortController: AbortController;
+	private blurTimeoutId: ReturnType<typeof setTimeout> | null = null;
+	private searchAbortController: AbortController | null = null;
+	private currentSearchId = 0;
 
 	constructor(
 		parent: HTMLElement,
@@ -46,55 +53,91 @@ export class AtomSearchInput {
 			this.config.debounceMs
 		);
 
+		this.abortController = new AbortController();
+
 		this.container = parent.createDiv({ cls: 'intuition-atom-search' });
 		this.render();
 	}
 
 	private render(): void {
-		// Input field
+		// Input field with ARIA attributes for accessibility
 		this.inputEl = this.container.createEl('input', {
 			cls: 'intuition-atom-search-input',
 		});
 		this.inputEl.type = 'text';
 		this.inputEl.placeholder = this.config.placeholder;
+		this.inputEl.setAttribute('role', 'combobox');
+		this.inputEl.setAttribute('aria-autocomplete', 'list');
+		this.inputEl.setAttribute('aria-expanded', 'false');
+		this.inputEl.setAttribute('aria-controls', 'atom-search-dropdown');
+		this.inputEl.setAttribute('aria-haspopup', 'listbox');
 
-		// Dropdown for suggestions
+		// Dropdown for suggestions with ARIA attributes
 		this.dropdownEl = this.container.createDiv({
 			cls: 'intuition-atom-search-dropdown',
 		});
+		this.dropdownEl.id = 'atom-search-dropdown';
+		this.dropdownEl.setAttribute('role', 'listbox');
 		this.dropdownEl.style.display = 'none';
 
-		// Preview for selected atom
+		// Preview for selected atom with ARIA live region
 		this.previewEl = this.container.createDiv({
 			cls: 'intuition-atom-search-preview',
 		});
+		this.previewEl.setAttribute('role', 'status');
+		this.previewEl.setAttribute('aria-live', 'polite');
 		this.previewEl.style.display = 'none';
 
 		// Event listeners
-		this.inputEl.addEventListener('input', () => this.handleInput());
-		this.inputEl.addEventListener('keydown', (e) => this.handleKeydown(e));
-		this.inputEl.addEventListener('focus', () => this.showDropdown());
+		this.inputEl.addEventListener('input', () => this.handleInput(), {
+			signal: this.abortController.signal,
+		});
+		this.inputEl.addEventListener('keydown', (e) => this.handleKeydown(e), {
+			signal: this.abortController.signal,
+		});
+		this.inputEl.addEventListener('focus', () => this.showDropdown(), {
+			signal: this.abortController.signal,
+		});
 		this.inputEl.addEventListener('blur', () => {
 			// Delay to allow click on dropdown
-			setTimeout(() => this.hideDropdown(), 200);
+			this.blurTimeoutId = setTimeout(() => {
+				this.hideDropdown();
+				this.blurTimeoutId = null;
+			}, SEARCH_UI_TIMING.BLUR_DELAY_MS);
+		}, {
+			signal: this.abortController.signal,
 		});
 	}
 
 	private handleInput(): void {
-		const query = this.inputEl.value.trim();
-		this.state.query = query;
+		const rawQuery = this.inputEl.value;
+		const query = validateSearchQuery(
+			rawQuery,
+			SEARCH_UI_TIMING.MAX_QUERY_LENGTH
+		);
 
-		if (query.length < this.config.minQueryLength) {
+		if (!query || query.length < this.config.minQueryLength) {
 			this.hideDropdown();
+			this.state.query = '';
 			return;
 		}
 
+		this.state.query = query;
 		this.state.isSearching = true;
 		this.renderDropdown();
 		this.debouncedSearch(query);
 	}
 
 	private async performSearch(query: string): Promise<void> {
+		// Cancel previous search
+		if (this.searchAbortController) {
+			this.searchAbortController.abort();
+		}
+
+		// Create new abort controller for this search
+		this.searchAbortController = new AbortController();
+		const searchId = ++this.currentSearchId;
+
 		try {
 			// Run both searches in parallel
 			const [semanticResults, labelResults] = await Promise.allSettled([
@@ -107,6 +150,11 @@ export class AtomSearchInput {
 					limit: this.config.maxResults,
 				}),
 			]);
+
+			// Check if this search is still current
+			if (searchId !== this.currentSearchId) {
+				return; // Newer search has started, discard these results
+			}
 
 			// Extract successful results
 			const semantic =
@@ -126,9 +174,16 @@ export class AtomSearchInput {
 			this.state.isSearching = false;
 			this.state.error = null;
 		} catch (error) {
-			this.state.error = error.message;
-			this.state.isSearching = false;
-			this.state.results = [];
+			// Only update state if this is still the current search
+			if (searchId === this.currentSearchId) {
+				const errorMessage =
+					error instanceof Error
+						? error.message
+						: 'An unexpected error occurred during search';
+				this.state.error = errorMessage;
+				this.state.isSearching = false;
+				this.state.results = [];
+			}
 		}
 
 		this.renderDropdown();
@@ -221,17 +276,14 @@ export class AtomSearchInput {
 					index === this.state.selectedIndex ? 'selected' : ''
 				}`,
 			});
+			item.setAttribute('role', 'option');
+			item.setAttribute(
+				'aria-selected',
+				(index === this.state.selectedIndex).toString()
+			);
 
 			// Icon/Emoji/Image
-			if (atom.cachedImage?.url) {
-				const img = item.createEl('img', { cls: 'suggestion-icon' });
-				img.src = atom.cachedImage.url;
-			} else if (atom.emoji) {
-				item.createSpan({ cls: 'suggestion-icon', text: atom.emoji });
-			} else if (atom.image) {
-				const img = item.createEl('img', { cls: 'suggestion-icon' });
-				img.src = atom.image;
-			}
+			this.renderAtomImage(item, atom, 'suggestion-icon');
 
 			// Label
 			item.createSpan({ cls: 'suggestion-label', text: atom.label });
@@ -274,6 +326,11 @@ export class AtomSearchInput {
 						: ''
 				}`,
 			});
+			createItem.setAttribute('role', 'option');
+			createItem.setAttribute(
+				'aria-selected',
+				(this.state.selectedIndex === this.state.results.length).toString()
+			);
 
 			createItem.createSpan({ cls: 'suggestion-icon', text: '+' });
 			createItem.createSpan({
@@ -304,11 +361,35 @@ export class AtomSearchInput {
 	private showDropdown(): void {
 		if (this.state.query.length >= this.config.minQueryLength) {
 			this.dropdownEl.style.display = 'block';
+			this.inputEl.setAttribute('aria-expanded', 'true');
 		}
 	}
 
 	private hideDropdown(): void {
 		this.dropdownEl.style.display = 'none';
+		this.inputEl.setAttribute('aria-expanded', 'false');
+	}
+
+	/**
+	 * Renders an atom's icon/emoji/image with XSS protection
+	 * @param container - Container element to render into
+	 * @param atom - Atom data with image/emoji information
+	 * @param className - CSS class for the rendered element
+	 */
+	private renderAtomImage(
+		container: HTMLElement,
+		atom: AtomData,
+		className: string
+	): void {
+		if (atom.cachedImage?.url) {
+			const img = container.createEl('img', { cls: className });
+			setImageSrc(img, atom.cachedImage.url, atom.emoji || undefined);
+		} else if (atom.emoji) {
+			container.createSpan({ cls: className, text: atom.emoji });
+		} else if (atom.image) {
+			const img = container.createEl('img', { cls: className });
+			setImageSrc(img, atom.image);
+		}
 	}
 
 	private showPreview(ref: AtomReference): void {
@@ -320,15 +401,7 @@ export class AtomSearchInput {
 			const header = this.previewEl.createDiv({ cls: 'preview-header' });
 
 			// Icon
-			if (atom.cachedImage?.url) {
-				const img = header.createEl('img', { cls: 'preview-icon' });
-				img.src = atom.cachedImage.url;
-			} else if (atom.emoji) {
-				header.createSpan({ cls: 'preview-icon', text: atom.emoji });
-			} else if (atom.image) {
-				const img = header.createEl('img', { cls: 'preview-icon' });
-				img.src = atom.image;
-			}
+			this.renderAtomImage(header, atom, 'preview-icon');
 
 			header.createSpan({ cls: 'preview-label', text: atom.label });
 			header.createSpan({ cls: 'preview-type', text: atom.type });
@@ -407,6 +480,16 @@ export class AtomSearchInput {
 	 * Clean up component resources
 	 */
 	destroy(): void {
+		this.debouncedSearch.cancel();
+		if (this.searchAbortController) {
+			this.searchAbortController.abort();
+			this.searchAbortController = null;
+		}
+		if (this.blurTimeoutId !== null) {
+			clearTimeout(this.blurTimeoutId);
+			this.blurTimeoutId = null;
+		}
+		this.abortController.abort();
 		this.container.remove();
 	}
 }

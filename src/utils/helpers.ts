@@ -91,3 +91,100 @@ export function createDeterministicCacheKey<T extends Record<string, any>>(
 
 	return `${prefix}${serialized}`;
 }
+
+/**
+ * Validates that a URL is safe to use in img src attributes.
+ * Only allows http:// and https:// schemes to prevent XSS attacks.
+ *
+ * @param url - URL to validate
+ * @returns true if URL is safe, false otherwise
+ *
+ * @example
+ * isValidImageUrl('https://example.com/img.png') // true
+ * isValidImageUrl('javascript:alert(1)') // false
+ * isValidImageUrl('data:text/html,<script>alert(1)</script>') // false
+ */
+export function isValidImageUrl(
+	url: string | undefined | null
+): boolean {
+	if (!url || typeof url !== 'string') {
+		return false;
+	}
+
+	try {
+		const parsed = new URL(url);
+		return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Safely sets an image element's src attribute with validation and error handling.
+ * Validates URL scheme and provides fallback icon on error.
+ *
+ * @param img - Image element to set src on
+ * @param url - URL to set (will be validated)
+ * @param fallbackIcon - Optional fallback text to display on error
+ *
+ * @example
+ * const img = document.createElement('img');
+ * setImageSrc(img, atom.image, atom.emoji || '?');
+ */
+export function setImageSrc(
+	img: HTMLImageElement,
+	url: string | undefined | null,
+	fallbackIcon?: string
+): void {
+	if (!isValidImageUrl(url)) {
+		if (fallbackIcon) {
+			const span = document.createElement('span');
+			span.className = img.className;
+			span.textContent = fallbackIcon;
+			img.replaceWith(span);
+		}
+		return;
+	}
+
+	img.src = url!;
+	img.onerror = () => {
+		if (fallbackIcon) {
+			const span = document.createElement('span');
+			span.className = img.className;
+			span.textContent = fallbackIcon;
+			img.replaceWith(span);
+		} else {
+			img.style.display = 'none';
+		}
+	};
+}
+
+/**
+ * Validates search query input to prevent injection attacks.
+ * Limits length and checks type for security.
+ *
+ * @param query - User input to validate
+ * @param maxLength - Maximum allowed length (default: 200)
+ * @returns Sanitized query or null if invalid
+ *
+ * @example
+ * validateSearchQuery('ethereum', 200) // 'ethereum'
+ * validateSearchQuery('  bitcoin  ', 200) // 'bitcoin'
+ * validateSearchQuery('a'.repeat(300), 200) // null (too long)
+ */
+export function validateSearchQuery(
+	query: string,
+	maxLength = 200
+): string | null {
+	if (typeof query !== 'string') {
+		return null;
+	}
+
+	const trimmed = query.trim();
+
+	if (trimmed.length === 0 || trimmed.length > maxLength) {
+		return null;
+	}
+
+	return trimmed;
+}
