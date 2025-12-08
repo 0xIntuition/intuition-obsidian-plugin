@@ -13,6 +13,12 @@ export default defineConfig({
 			'tests/**/*.{test,spec}.ts'
 		],
 
+		// Exclude integration tests (run separately)
+		exclude: [
+			'**/node_modules/**',
+			'tests/integration/**'
+		],
+
 		// Timeout for async operations
 		testTimeout: 10000,
 
