@@ -7,10 +7,10 @@ import { WALLET_ERRORS } from '../../types/constants';
  */
 export class WalletSetupModal extends Modal {
 	plugin: IntuitionPlugin;
-	private password: string = '';
-	private confirmPassword: string = '';
+	private password = '';
+	private confirmPassword = '';
 	private mode: 'create' | 'import' = 'create';
-	private privateKey: string = '';
+	private privateKey = '';
 
 	constructor(app: App, plugin: IntuitionPlugin) {
 		super(app);

@@ -6,7 +6,7 @@ import type IntuitionPlugin from '../../main';
  */
 export class WalletDeleteModal extends Modal {
 	plugin: IntuitionPlugin;
-	private password: string = '';
+	private password = '';
 	private onSuccess?: () => void;
 
 	constructor(
