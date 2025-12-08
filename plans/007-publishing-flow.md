@@ -101,20 +101,37 @@ export interface PublishResult {
 ### Impact Calculator (src/services/impact-calculator.ts)
 
 ```typescript
-import { VaultData, ConsensusData } from '../types/intuition';
+import { PublicClient } from 'viem';
+import { VaultData } from '../types/intuition';
 import { ImpactPreview } from '../types/staking';
+import { MULTI_VAULT_ABI } from './transaction-service'; // Assuming ABI is exported
 
 export class ImpactCalculator {
-  // Bonding curve parameters (from Intuition protocol)
-  private static readonly CURVE_OFFSET = BigInt('100000000000000000'); // 1e17
-  private static readonly CURVE_SLOPE = BigInt('30000000000000000000'); // 3e19
+  private publicClient: PublicClient;
+  private multiVaultAddress: `0x${string}`;
 
-  calculateImpact(
+  constructor(publicClient: PublicClient, multiVaultAddress: `0x${string}`) {
+    this.publicClient = publicClient;
+    this.multiVaultAddress = multiVaultAddress;
+  }
+
+  async calculateImpact(
     forVault: VaultData,
     againstVault: VaultData,
     stakeAmount: bigint,
     position: 'for' | 'against'
-  ): ImpactPreview {
+  ): Promise<ImpactPreview> {
+    const targetVault = position === 'for' ? forVault : againstVault;
+    const opposingVault = position === 'for' ? againstVault : forVault;
+
+    // Use a read-only contract call to preview the number of shares
+    const yourShares = await this.publicClient.readContract({
+      address: this.multiVaultAddress,
+      abi: MULTI_VAULT_ABI,
+      functionName: 'previewDeposit',
+      args: [BigInt(targetVault.id), stakeAmount],
+    }) as bigint;
+
     // Current state
     const currentForAssets = forVault.totalAssets;
     const currentAgainstAssets = againstVault.totalAssets;
@@ -123,7 +140,7 @@ export class ImpactCalculator {
       ? Number((currentForAssets * 10000n) / currentTotal) / 100
       : 50;
 
-    // After stake
+    // New state after your stake
     const newForAssets = position === 'for'
       ? currentForAssets + stakeAmount
       : currentForAssets;
@@ -135,22 +152,18 @@ export class ImpactCalculator {
       ? Number((newForAssets * 10000n) / newTotal) / 100
       : 50;
 
-    // Shares calculation using bonding curve
-    const targetVault = position === 'for' ? forVault : againstVault;
-    const yourShares = this.calculateSharesFromDeposit(targetVault, stakeAmount);
-
     // Ownership
     const newTotalShares = targetVault.totalShares + yourShares;
     const yourOwnershipPercent = newTotalShares > 0n
       ? Number((yourShares * 10000n) / newTotalShares) / 100
       : 0;
-
-    // Exit value (immediate, at current price)
+    
+    // Exit value at current price
     const currentSharePrice = targetVault.currentSharePrice;
     const estimatedExitValue = (yourShares * currentSharePrice) / BigInt(1e18);
-
-    // Fee estimation (simplified - would need historical data for accuracy)
-    const estimatedMonthlyFees = 0n; // TODO: Implement based on activity data
+    
+    // Fee estimation (simplified)
+    const estimatedMonthlyFees = 0n;
     const breakEvenMonths = null;
 
     return {
@@ -164,44 +177,6 @@ export class ImpactCalculator {
       estimatedMonthlyFees,
       breakEvenMonths,
     };
-  }
-
-  calculateSharesFromDeposit(vault: VaultData, depositAmount: bigint): bigint {
-    // Using the Offset Progressive Curve formula
-    // shares = sqrt(2 * slope * (totalAssets + deposit) + offset^2) - sqrt(2 * slope * totalAssets + offset^2)
-
-    const slope = ImpactCalculator.CURVE_SLOPE;
-    const offset = ImpactCalculator.CURVE_OFFSET;
-    const offsetSquared = offset * offset;
-
-    const currentAssets = vault.totalAssets;
-    const newAssets = currentAssets + depositAmount;
-
-    // sqrt(2 * slope * newAssets + offset^2)
-    const newTerm = this.sqrt(2n * slope * newAssets + offsetSquared);
-
-    // sqrt(2 * slope * currentAssets + offset^2)
-    const currentTerm = currentAssets > 0n
-      ? this.sqrt(2n * slope * currentAssets + offsetSquared)
-      : offset;
-
-    return newTerm - currentTerm;
-  }
-
-  // Integer square root using Newton's method
-  private sqrt(n: bigint): bigint {
-    if (n < 0n) throw new Error('Square root of negative number');
-    if (n === 0n) return 0n;
-
-    let x = n;
-    let y = (x + 1n) / 2n;
-
-    while (y < x) {
-      x = y;
-      y = (x + n / x) / 2n;
-    }
-
-    return x;
   }
 }
 ```
@@ -218,8 +193,8 @@ import { TransactionPlan, TransactionStep, PublishResult } from '../types/transa
 import { NETWORKS } from '../types/networks';
 import IntuitionPlugin from '../main';
 
-// MultiVault ABI (partial)
-const MULTI_VAULT_ABI = [
+// MultiVault ABI (partial) - EXPORTED for use in ImpactCalculator
+export const MULTI_VAULT_ABI = [
   {
     name: 'createAtom',
     type: 'function',
@@ -245,6 +220,16 @@ const MULTI_VAULT_ABI = [
     ],
     outputs: [{ name: 'shares', type: 'uint256' }],
   },
+  {
+    name: 'previewDeposit',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+        { name: 'vaultId', type: 'uint256' },
+        { name: 'depositAmount', type: 'uint256' }
+    ],
+    outputs: [{ name: 'shares', type: 'uint256' }]
+  }
 ] as const;
 
 export class TransactionService {
@@ -368,7 +353,9 @@ export class TransactionService {
             } else {
               throw new Error('Unexpected createAtom step');
             }
-
+            
+            // SIMPLIFICATION: Atom URI is just the string label encoded as bytes.
+            // No complex object structure or IPFS upload is involved.
             const atomUri = new TextEncoder().encode(atomData);
 
             hash = await walletClient.writeContract({
