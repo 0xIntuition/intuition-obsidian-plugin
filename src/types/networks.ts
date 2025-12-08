@@ -1,33 +1,75 @@
 /**
  * Network configuration types and constants
+ *
+ * Network data sourced from official Intuition packages:
+ * - @0xintuition/protocol: Chain configs and MultiVault addresses
+ * - @0xintuition/graphql: GraphQL API endpoints
  */
+
+import {
+	intuitionTestnet,
+	intuitionMainnet,
+	getMultiVaultAddressFromChainId,
+} from '@0xintuition/protocol';
+import { API_URL_DEV, API_URL_PROD } from '@0xintuition/graphql';
+import type { Chain } from 'viem';
 
 export type NetworkType = 'testnet' | 'mainnet';
 
 export interface NetworkConfig {
-  chainId: number;
-  name: string;
-  rpcUrl: string;
-  explorerUrl: string;
-  graphqlUrl: string;
-  multiVaultAddress: `0x${string}`;
+	chainId: number;
+	name: string;
+	rpcUrl: string;
+	explorerUrl: string;
+	graphqlUrl: string;
+	multiVaultAddress: `0x${string}`;
+}
+
+/**
+ * Converts a viem Chain object to NetworkConfig format
+ *
+ * @param chain - Viem chain configuration from @0xintuition/protocol
+ * @param graphqlUrl - GraphQL endpoint URL from @0xintuition/graphql
+ * @returns NetworkConfig object compatible with existing interface
+ * @throws Error if required chain properties are missing
+ */
+function createNetworkConfig(
+	chain: Chain,
+	graphqlUrl: string
+): NetworkConfig {
+	// Validate required chain properties exist
+	if (!chain.blockExplorers?.default?.url) {
+		throw new Error(
+			`Chain ${chain.name} (${chain.id}) missing block explorer configuration`
+		);
+	}
+
+	if (!chain.rpcUrls?.default?.http?.[0]) {
+		throw new Error(
+			`Chain ${chain.name} (${chain.id}) missing RPC URL configuration`
+		);
+	}
+
+	// Get multiVault address for this chain
+	const multiVaultAddress = getMultiVaultAddressFromChainId(chain.id);
+
+	if (!multiVaultAddress) {
+		throw new Error(
+			`No MultiVault address found for chain ${chain.name} (${chain.id})`
+		);
+	}
+
+	return {
+		chainId: chain.id,
+		name: chain.name,
+		rpcUrl: chain.rpcUrls.default.http[0],
+		explorerUrl: chain.blockExplorers.default.url,
+		graphqlUrl,
+		multiVaultAddress: multiVaultAddress as `0x${string}`,
+	};
 }
 
 export const NETWORKS: Record<NetworkType, NetworkConfig> = {
-  testnet: {
-    chainId: 13579,
-    name: 'Intuition Testnet',
-    rpcUrl: 'https://testnet.rpc.intuition.systems',
-    explorerUrl: 'https://testnet.explorer.intuition.systems',
-    graphqlUrl: 'https://testnet.intuition.sh/v1/graphql',
-    multiVaultAddress: '0x2Ece8D4dEdcB9918A398528f3fa4688b1d2CAB91',
-  },
-  mainnet: {
-    chainId: 1155,
-    name: 'Intuition Mainnet',
-    rpcUrl: 'https://rpc.intuition.systems',
-    explorerUrl: 'https://explorer.intuition.systems',
-    graphqlUrl: 'https://mainnet.intuition.sh/v1/graphql',
-    multiVaultAddress: '0x6E35cF57A41fA15eA0EaE9C33e751b01A784Fe7e',
-  },
+	testnet: createNetworkConfig(intuitionTestnet, API_URL_DEV),
+	mainnet: createNetworkConfig(intuitionMainnet, API_URL_PROD),
 } as const;

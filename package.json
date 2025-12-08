@@ -5,26 +5,38 @@
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
-		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+		"build": "npm run test && tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:ui": "vitest --ui",
+		"test:coverage": "vitest run --coverage",
+		"lint": "eslint src --ext .ts",
+		"lint:fix": "eslint src --ext .ts --fix",
+		"type-check": "tsc -noEmit -skipLibCheck",
+		"ci": "npm run lint && npm run test:coverage && npm run build"
 	},
 	"keywords": [],
 	"author": "0xIntuition",
 	"license": "MIT",
 	"dependencies": {
-		"@0xintuition/sdk": "^2.0.0-alpha.4",
-		"@0xintuition/graphql": "^2.0.0-alpha.4",
-		"@0xintuition/protocol": "^2.0.0-alpha.4",
-		"viem": "^2.0.0",
-		"idb": "^7.0.0"
+		"@0xintuition/graphql": "^2.0.1",
+		"@0xintuition/protocol": "^2.0.1",
+		"@0xintuition/sdk": "^2.0.1",
+		"idb": "^7.0.0",
+		"viem": "^2.0.0"
 	},
 	"devDependencies": {
 		"@types/node": "^18.0.0",
 		"@typescript-eslint/eslint-plugin": "5.29.0",
 		"@typescript-eslint/parser": "5.29.0",
+		"@vitest/coverage-v8": "^1.6.1",
+		"@vitest/ui": "^1.6.1",
 		"builtin-modules": "3.3.0",
 		"esbuild": "^0.19.0",
+		"happy-dom": "^12.10.3",
 		"obsidian": "latest",
 		"tslib": "2.4.0",
-		"typescript": "^5.0.0"
+		"typescript": "^5.0.0",
+		"vitest": "^1.6.1"
 	}
 }
