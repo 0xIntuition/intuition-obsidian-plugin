@@ -1,123 +1,113 @@
-import type { IntuitionSettings } from '../../src/types/settings';
+import type { IntuitionPluginSettings } from '../../src/types/settings';
 
-// Default test settings
-export const DEFAULT_TEST_SETTINGS: IntuitionSettings = {
-	network: 'base-sepolia',
-	rpcUrl: 'https://sepolia.base.org',
-	graphqlApiUrl: 'https://api.intuition.systems/graphql',
-	minimumStakeAmount: '0.0001',
-	walletEncrypted: null,
-	walletAddress: null,
-	autoRefreshInterval: 30000,
-	cacheSettings: {
-		enabled: true,
-		ttl: 300000,
-		maxSize: 100,
+// Default test settings (testnet)
+export const DEFAULT_TEST_SETTINGS: IntuitionPluginSettings = {
+	version: '1.0.0',
+	initialized: true,
+	network: 'testnet',
+	customRpcUrl: null,
+	wallet: {
+		hasWallet: false,
+		encryptedPrivateKey: null,
+		encryptionSalt: null,
+		address: null,
 	},
-	uiSettings: {
+	features: {
+		enableDecorations: true,
+		enableHoverCards: true,
+		enableClaimIndicators: false,
+		enableOfflineQueue: true,
+	},
+	cache: {
+		atomTTL: 3600000,
+		vaultTTL: 300000,
+		searchTTL: 600000,
+		maxCacheSize: 50 * 1024 * 1024,
+	},
+	ui: {
 		showStatusBar: true,
 		showRibbonIcon: true,
-		compactMode: false,
 		theme: 'auto',
-	},
-	advancedSettings: {
-		debugMode: false,
-		customHeaders: {},
-		timeout: 30000,
+		compactMode: false,
+		decorationPosition: 'inline',
 	},
 };
 
 // Test settings with wallet configured
-export const TEST_SETTINGS_WITH_WALLET: IntuitionSettings = {
+export const TEST_SETTINGS_WITH_WALLET: IntuitionPluginSettings = {
 	...DEFAULT_TEST_SETTINGS,
-	walletEncrypted: 'mock-encrypted-key:salt:iv',
-	walletAddress: '0x1234567890123456789012345678901234567890',
+	wallet: {
+		hasWallet: true,
+		encryptedPrivateKey: 'mock-encrypted-key',
+		encryptionSalt: 'mock-salt',
+		address: '0x1234567890123456789012345678901234567890',
+	},
 };
 
 // Test settings for mainnet
-export const TEST_SETTINGS_MAINNET: IntuitionSettings = {
+export const TEST_SETTINGS_MAINNET: IntuitionPluginSettings = {
 	...DEFAULT_TEST_SETTINGS,
-	network: 'base',
-	rpcUrl: 'https://mainnet.base.org',
-	graphqlApiUrl: 'https://api.intuition.systems/graphql',
+	network: 'mainnet',
 };
 
 // Invalid settings examples for testing validation
-export const INVALID_SETTINGS_NO_RPC: Partial<IntuitionSettings> = {
-	...DEFAULT_TEST_SETTINGS,
-	rpcUrl: '',
-};
-
-export const INVALID_SETTINGS_INVALID_NETWORK: Partial<IntuitionSettings> = {
+export const INVALID_SETTINGS_INVALID_NETWORK: Partial<IntuitionPluginSettings> = {
 	...DEFAULT_TEST_SETTINGS,
 	network: 'invalid-network' as any,
 };
 
-export const INVALID_SETTINGS_NEGATIVE_STAKE: Partial<IntuitionSettings> = {
+export const INVALID_SETTINGS_INVALID_CACHE_TTL: Partial<IntuitionPluginSettings> = {
 	...DEFAULT_TEST_SETTINGS,
-	minimumStakeAmount: '-0.001',
-};
-
-export const INVALID_SETTINGS_INVALID_CACHE_TTL: Partial<IntuitionSettings> = {
-	...DEFAULT_TEST_SETTINGS,
-	cacheSettings: {
-		enabled: true,
-		ttl: -1000,
-		maxSize: 100,
+	cache: {
+		atomTTL: -1000,
+		vaultTTL: -1000,
+		searchTTL: -1000,
+		maxCacheSize: 100,
 	},
 };
 
 // Corrupted settings for repair testing
-export const CORRUPTED_SETTINGS_MISSING_FIELDS: Partial<IntuitionSettings> = {
-	network: 'base-sepolia',
-	// Missing rpcUrl and other required fields
+export const CORRUPTED_SETTINGS_MISSING_FIELDS: Partial<IntuitionPluginSettings> = {
+	network: 'testnet',
+	// Missing other required fields
 };
 
 export const CORRUPTED_SETTINGS_NULL_VALUES: any = {
+	version: null,
+	initialized: null,
 	network: null,
-	rpcUrl: null,
-	graphqlApiUrl: null,
-	minimumStakeAmount: null,
-	walletEncrypted: null,
-	walletAddress: null,
+	customRpcUrl: null,
+	wallet: null,
+	features: null,
+	cache: null,
+	ui: null,
 };
 
-// Settings with custom advanced options
-export const TEST_SETTINGS_CUSTOM_ADVANCED: IntuitionSettings = {
+// Settings with cache disabled (minimal TTLs)
+export const TEST_SETTINGS_NO_CACHE: IntuitionPluginSettings = {
 	...DEFAULT_TEST_SETTINGS,
-	advancedSettings: {
-		debugMode: true,
-		customHeaders: {
-			'X-Custom-Header': 'test-value',
-			'Authorization': 'Bearer test-token',
-		},
-		timeout: 60000,
-	},
-};
-
-// Settings with cache disabled
-export const TEST_SETTINGS_NO_CACHE: IntuitionSettings = {
-	...DEFAULT_TEST_SETTINGS,
-	cacheSettings: {
-		enabled: false,
-		ttl: 0,
-		maxSize: 0,
+	cache: {
+		atomTTL: 0,
+		vaultTTL: 0,
+		searchTTL: 0,
+		maxCacheSize: 0,
 	},
 };
 
 // Settings with compact UI
-export const TEST_SETTINGS_COMPACT_UI: IntuitionSettings = {
+export const TEST_SETTINGS_COMPACT_UI: IntuitionPluginSettings = {
 	...DEFAULT_TEST_SETTINGS,
-	uiSettings: {
+	ui: {
 		showStatusBar: false,
 		showRibbonIcon: false,
 		compactMode: true,
 		theme: 'dark',
+		decorationPosition: 'gutter',
 	},
 };
 
 // Helper function to create test settings
-export function createTestSettings(overrides: Partial<IntuitionSettings> = {}): IntuitionSettings {
+export function createTestSettings(overrides: Partial<IntuitionPluginSettings> = {}): IntuitionPluginSettings {
 	return {
 		...DEFAULT_TEST_SETTINGS,
 		...overrides,
@@ -125,19 +115,23 @@ export function createTestSettings(overrides: Partial<IntuitionSettings> = {}): 
 }
 
 // Helper function to create settings with nested overrides
-export function createTestSettingsDeep(overrides: Partial<IntuitionSettings> = {}): IntuitionSettings {
+export function createTestSettingsDeep(overrides: Partial<IntuitionPluginSettings> = {}): IntuitionPluginSettings {
 	const base = { ...DEFAULT_TEST_SETTINGS };
 
-	if (overrides.cacheSettings) {
-		base.cacheSettings = { ...base.cacheSettings, ...overrides.cacheSettings };
+	if (overrides.wallet) {
+		base.wallet = { ...base.wallet, ...overrides.wallet };
 	}
 
-	if (overrides.uiSettings) {
-		base.uiSettings = { ...base.uiSettings, ...overrides.uiSettings };
+	if (overrides.features) {
+		base.features = { ...base.features, ...overrides.features };
 	}
 
-	if (overrides.advancedSettings) {
-		base.advancedSettings = { ...base.advancedSettings, ...overrides.advancedSettings };
+	if (overrides.cache) {
+		base.cache = { ...base.cache, ...overrides.cache };
+	}
+
+	if (overrides.ui) {
+		base.ui = { ...base.ui, ...overrides.ui };
 	}
 
 	return { ...base, ...overrides };

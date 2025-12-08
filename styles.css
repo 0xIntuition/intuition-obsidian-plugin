@@ -1,8 +1,215 @@
 /*
+ * Intuition Obsidian Plugin Styles
+ */
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+/* ============================================================================
+   Atom Search Component
+   ============================================================================ */
 
-If your plugin does not need CSS, delete this file.
+/* Container */
+.intuition-atom-search {
+	position: relative;
+	width: 100%;
+}
 
-*/
+/* Input field */
+.intuition-atom-search-input {
+	width: 100%;
+	padding: 8px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	font-size: 14px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	outline: none;
+	transition: border-color 0.2s;
+}
+
+.intuition-atom-search-input:focus {
+	border-color: var(--text-accent);
+}
+
+/* Dropdown panel */
+.intuition-atom-search-dropdown {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	right: 0;
+	margin-top: 4px;
+	max-height: 300px;
+	overflow-y: auto;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	z-index: 100;
+}
+
+/* Individual suggestion item */
+.intuition-atom-suggestion {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	cursor: pointer;
+	transition: background-color 0.15s;
+	flex-wrap: wrap;
+}
+
+.intuition-atom-suggestion:hover,
+.intuition-atom-suggestion.selected {
+	background: var(--background-modifier-hover);
+}
+
+/* Icon/emoji/image */
+.intuition-atom-suggestion .suggestion-icon,
+.preview-header .preview-icon {
+	width: 20px;
+	height: 20px;
+	text-align: center;
+	flex-shrink: 0;
+	border-radius: 3px;
+	object-fit: cover;
+}
+
+/* Label */
+.intuition-atom-suggestion .suggestion-label {
+	flex: 1;
+	font-weight: 500;
+	color: var(--text-normal);
+	min-width: 0;
+}
+
+/* Type badge */
+.intuition-atom-suggestion .suggestion-type {
+	font-size: 11px;
+	color: var(--text-muted);
+	background: var(--background-modifier-border);
+	padding: 2px 6px;
+	border-radius: 4px;
+	flex-shrink: 0;
+}
+
+/* Description (from semantic search) */
+.intuition-atom-suggestion .suggestion-description {
+	flex-basis: 100%;
+	font-size: 12px;
+	color: var(--text-muted);
+	margin-top: 4px;
+	line-height: 1.4;
+}
+
+/* Trust indicator */
+.intuition-atom-suggestion .suggestion-trust {
+	font-size: 11px;
+	color: var(--text-muted);
+	flex-shrink: 0;
+}
+
+/* "Create new" option */
+.intuition-atom-suggestion.create-new {
+	border-top: 1px solid var(--background-modifier-border);
+	color: var(--text-accent);
+}
+
+.intuition-atom-suggestion.create-new .suggestion-icon {
+	font-size: 16px;
+	font-weight: bold;
+}
+
+/* Loading/error/empty states */
+.intuition-atom-search-loading,
+.intuition-atom-search-error,
+.intuition-atom-search-empty {
+	padding: 12px;
+	text-align: center;
+	color: var(--text-muted);
+	font-size: 13px;
+}
+
+.intuition-atom-search-error {
+	color: var(--text-error);
+}
+
+/* Preview panel (selected atom) */
+.intuition-atom-search-preview {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 8px 12px;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	position: relative;
+}
+
+.intuition-atom-search-preview .preview-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.intuition-atom-search-preview .preview-label {
+	flex: 1;
+	font-weight: 500;
+	color: var(--text-normal);
+}
+
+.intuition-atom-search-preview .preview-type {
+	font-size: 11px;
+	color: var(--text-muted);
+	background: var(--background-modifier-border);
+	padding: 2px 6px;
+	border-radius: 4px;
+}
+
+.intuition-atom-search-preview .preview-description {
+	font-size: 12px;
+	color: var(--text-muted);
+	line-height: 1.4;
+}
+
+.intuition-atom-search-preview .preview-stats {
+	font-size: 11px;
+	color: var(--text-muted);
+	display: flex;
+	gap: 12px;
+}
+
+.intuition-atom-search-preview .preview-clear {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	background: none;
+	border: none;
+	cursor: pointer;
+	font-size: 20px;
+	line-height: 1;
+	color: var(--text-muted);
+	padding: 0;
+	width: 24px;
+	height: 24px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 4px;
+	transition: background-color 0.15s;
+}
+
+.intuition-atom-search-preview .preview-clear:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+/* New atom preview */
+.intuition-atom-search-preview .preview-new {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.intuition-atom-search-preview .preview-new .preview-icon {
+	font-size: 16px;
+	font-weight: bold;
+	color: var(--text-accent);
+}

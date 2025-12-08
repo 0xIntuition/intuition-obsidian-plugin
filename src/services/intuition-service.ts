@@ -26,6 +26,7 @@ import {
 	GraphQLTriple,
 	GraphQLVault,
 	GraphQLPosition,
+	GraphQLSemanticSearchResult,
 } from '../types';
 import type IntuitionPlugin from '../main';
 import type { WalletService } from './wallet-service';
@@ -38,52 +39,12 @@ const QUERIES = {
 		query GetAtom($termId: String!) {
 			atoms(where: { term_id: { _eq: $termId } }, limit: 1) {
 				term_id
-				vault_id
 				label
 				emoji
-				atom_type
+				type
 				image
 				creator_id
-				block_timestamp
-			}
-		}
-	`,
-
-	SEARCH_ATOMS: `
-		query SearchAtoms($label: String, $type: String, $creatorId: String, $limit: Int, $offset: Int) {
-			atoms(
-				where: {
-					_and: [
-						{ label: { _ilike: $label } }
-						{ atom_type: { _eq: $type } }
-						{ creator_id: { _eq: $creatorId } }
-					]
-				}
-				limit: $limit
-				offset: $offset
-				order_by: { block_timestamp: desc }
-			) {
-				term_id
-				vault_id
-				label
-				emoji
-				atom_type
-				image
-				creator_id
-				block_timestamp
-			}
-			atoms_aggregate(
-				where: {
-					_and: [
-						{ label: { _ilike: $label } }
-						{ atom_type: { _eq: $type } }
-						{ creator_id: { _eq: $creatorId } }
-					]
-				}
-			) {
-				aggregate {
-					count
-				}
+				created_at
 			}
 		}
 	`,
@@ -173,6 +134,31 @@ const QUERIES = {
 					total_shares
 					current_share_price
 					position_count
+				}
+			}
+		}
+	`,
+
+	SEMANTIC_ATOM_SEARCH: `
+		query SemanticAtomSearch($query: String, $limit: Int) {
+			search_term(args: {query: $query}, limit: $limit) {
+				atom {
+					term_id
+					label
+					emoji
+					type
+					image
+					creator_id
+					created_at
+					cached_image {
+						url
+						safe
+					}
+					value {
+						json_object {
+							description: data(path: "description")
+						}
+					}
 				}
 			}
 		}
@@ -286,28 +272,104 @@ export class IntuitionService extends BaseService {
 			return cached;
 		}
 
-		// Build variables
+		// Build where conditions dynamically (only include what's provided)
+		const whereConditions: string[] = [];
 		const variables: Record<string, unknown> = {
 			limit,
 			offset,
 		};
 
 		if (label) {
+			whereConditions.push('{ label: { _ilike: $label } }');
 			variables.label = `%${label}%`; // ILIKE pattern
 		}
 		if (type) {
+			whereConditions.push('{ type: { _eq: $type } }');
 			variables.type = type;
 		}
 		if (creatorId) {
+			whereConditions.push('{ creator_id: { _eq: $creatorId } }');
 			variables.creatorId = creatorId.toLowerCase();
 		}
+
+		// Build where clause
+		const whereClause =
+			whereConditions.length > 0
+				? `where: { _and: [${whereConditions.join(', ')}] }`
+				: '';
+
+		// Build dynamic query
+		const query = `
+			query SearchAtoms($label: String, $type: atom_type, $creatorId: String, $limit: Int!, $offset: Int!) {
+				atoms(
+					${whereClause}
+					limit: $limit
+					offset: $offset
+					order_by: { created_at: desc }
+				) {
+					term_id
+					label
+					emoji
+					type
+					image
+					creator_id
+					created_at
+				}
+				atoms_aggregate(
+					${whereClause}
+				) {
+					aggregate {
+						count
+					}
+				}
+			}
+		`;
 
 		// Query GraphQL
 		const response = await this.graphqlClient.query<{
 			atoms: GraphQLAtom[];
-		}>(QUERIES.SEARCH_ATOMS, variables);
+		}>(query, variables);
 
 		const atoms = response.atoms.map((a) => this.mapAtom(a));
+
+		// Cache results
+		this.cacheService.set(
+			cacheKey,
+			atoms,
+			this.plugin.settings.cache.searchTTL
+		);
+
+		return atoms;
+	}
+
+	/**
+	 * Semantic search for atoms using AI-powered contextual matching
+	 * Returns atoms based on meaning/context, not just label matching
+	 */
+	async semanticSearchAtoms(
+		query: string,
+		limit = 10
+	): Promise<AtomData[]> {
+		// Create deterministic cache key
+		const cacheKey = createDeterministicCacheKey('semantic-search:', {
+			query,
+			limit,
+		});
+
+		// Check cache
+		const cached = this.cacheService.get<AtomData[]>(cacheKey);
+		if (cached) {
+			return cached;
+		}
+
+		// Query GraphQL
+		const response = await this.graphqlClient.query<{
+			search_term: GraphQLSemanticSearchResult[];
+		}>(QUERIES.SEMANTIC_ATOM_SEARCH, { query, limit });
+
+		const atoms = response.search_term.map((result) =>
+			this.mapSemanticAtom(result.atom)
+		);
 
 		// Cache results
 		this.cacheService.set(
@@ -518,13 +580,22 @@ export class IntuitionService extends BaseService {
 	private mapAtom(atom: GraphQLAtom): AtomData {
 		return {
 			id: atom.term_id,
-			vaultId: atom.vault_id,
 			label: atom.label,
 			emoji: atom.emoji,
-			type: (atom.atom_type as AtomType) || AtomType.THING,
+			type: (atom.type as AtomType) || AtomType.THING,
 			image: atom.image,
 			creatorId: atom.creator_id,
-			blockTimestamp: parseInt(atom.block_timestamp),
+			createdAt: new Date(atom.created_at).getTime(),
+		};
+	}
+
+	private mapSemanticAtom(
+		atom: GraphQLSemanticSearchResult['atom']
+	): AtomData {
+		return {
+			...this.mapAtom(atom), // Reuse existing mapper
+			cachedImage: atom.cached_image || undefined,
+			description: atom.value?.json_object?.description || undefined,
 		};
 	}
 
@@ -611,6 +682,13 @@ export class IntuitionService extends BaseService {
 	 */
 	invalidateSearchCache(): void {
 		this.cacheService.invalidatePattern('search:');
+	}
+
+	/**
+	 * Invalidate all semantic search caches
+	 */
+	invalidateSemanticSearchCache(): void {
+		this.cacheService.invalidatePattern('semantic-search:');
 	}
 
 	/**

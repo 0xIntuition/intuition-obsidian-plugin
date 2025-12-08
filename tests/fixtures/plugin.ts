@@ -1,6 +1,6 @@
 import { createMockApp, createMockPlugin } from '../mocks/obsidian';
 import { DEFAULT_TEST_SETTINGS } from './settings';
-import type { IntuitionSettings } from '../../src/types/settings';
+import type { IntuitionPluginSettings } from '../../src/types/settings';
 
 // Mock manifest for plugin testing
 export const MOCK_MANIFEST = {
@@ -15,7 +15,7 @@ export const MOCK_MANIFEST = {
 };
 
 // Create a mock plugin instance with default settings
-export function createTestPlugin(settings: Partial<IntuitionSettings> = {}) {
+export function createTestPlugin(settings: Partial<IntuitionPluginSettings> = {}) {
 	const app = createMockApp();
 	const manifest = { ...MOCK_MANIFEST };
 	const plugin = createMockPlugin(app, manifest);
@@ -38,7 +38,7 @@ export function createTestPlugin(settings: Partial<IntuitionSettings> = {}) {
 // Create a mock plugin with specific state
 export interface MockPluginState {
 	isLoaded: boolean;
-	settings: IntuitionSettings;
+	settings: IntuitionPluginSettings;
 	hasWallet: boolean;
 	isWalletUnlocked: boolean;
 }

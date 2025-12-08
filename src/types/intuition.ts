@@ -14,6 +14,10 @@ export enum AtomType {
 	PERSON = 'Person',
 	ORGANIZATION = 'Organization',
 	BOOK = 'Book',
+	TEXT_OBJECT = 'TextObject',
+	BYTE_OBJECT = 'ByteObject',
+	JSON_OBJECT = 'JsonObject',
+	CAIP10 = 'CAIP10',
 }
 
 /**
@@ -22,13 +26,19 @@ export enum AtomType {
  */
 export interface AtomData {
 	id: string; // termId (numeric string)
-	vaultId: string; // Vault ID for this atom
 	label: string; // Human-readable label
 	emoji: string | null; // Optional emoji representation
 	type: AtomType; // Semantic type
 	image: string | null; // Optional image URL
 	creatorId: string; // Creator's address
-	blockTimestamp: number; // When created (Unix timestamp)
+	createdAt: number; // When created (Unix timestamp in milliseconds)
+
+	// Enhanced fields from semantic search
+	cachedImage?: {
+		url: string;
+		safe: boolean;
+	};
+	description?: string; // Atom description from value.json_object
 }
 
 /**

@@ -4,5 +4,6 @@ export * from './graphql';
 export * from './intuition';
 export * from './networks';
 export * from './plugin';
+export * from './search';
 export * from './settings';
 export * from './wallet';

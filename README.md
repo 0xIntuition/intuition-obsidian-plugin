@@ -9,9 +9,16 @@ The Intuition Obsidian Plugin integrates [Intuition](https://intuition.systems) 
 ## Features
 
 ### Current
-- **Plugin Foundation**: Basic plugin architecture with modular service layer
-- **Ribbon Icon**: Quick access to plugin features
-- **Command Palette**: Placeholder command for future claim publishing
+- **Plugin Foundation**: Complete plugin architecture with modular service layer
+- **Settings System**: Comprehensive configuration UI with network selection
+- **Embedded Wallet**: Secure encrypted wallet with key management
+- **Intuition SDK Integration**: GraphQL client with caching and error handling
+- **Atom Search**: AI-powered semantic search with fuzzy matching and autocomplete
+  - Dual search strategy (semantic + label-based)
+  - Intelligent result ranking and deduplication
+  - Rich metadata display (descriptions, types, trust indicators)
+  - Create new atoms directly from search
+  - Keyboard navigation support
 
 ### Planned
 The plugin is under active development with 12 implementation plans:
@@ -19,8 +26,8 @@ The plugin is under active development with 12 implementation plans:
 1. **Project Foundation** ✅ - Core architecture and plugin setup
 2. **Settings System** ✅ - Configurable plugin options
 3. **Embedded Wallet** ✅ - Secure wallet integration with key management
-4. **SDK Integration** - Connection to Intuition's protocol via SDK
-5. **Atom Search** - Search and browse the global knowledge graph
+4. **SDK Integration** ✅ - Connection to Intuition's protocol via GraphQL
+5. **Atom Search** ✅ - Search and browse the global knowledge graph with AI-powered semantic search
 6. **Claim Modal** - UI for creating and publishing claims
 7. **Publishing Flow** - Submit claims to the blockchain
 8. **Offline Queue** - Queue claims when offline
@@ -110,7 +117,7 @@ This project follows a phased implementation approach. Check the `plans/` direct
 - Implementation order and dependencies
 - Acceptance criteria and testing requirements
 
-Current status: **Plan 001 Complete** (Foundation)
+Current status: **Plans 001-005 Complete** (Foundation, Settings, Wallet, SDK Integration, Atom Search)
 
 ## Contributing
 

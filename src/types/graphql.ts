@@ -34,13 +34,12 @@ export interface PaginatedResponse<T> {
  */
 export interface GraphQLAtom {
 	term_id: string;
-	vault_id: string;
 	label: string;
 	emoji: string | null;
-	atom_type: string;
+	type: string;
 	image: string | null;
 	creator_id: string;
-	block_timestamp: string; // Unix timestamp as string
+	created_at: string; // ISO 8601 timestamp
 }
 
 /**
@@ -81,4 +80,22 @@ export interface GraphQLPosition {
 	account_id: string;
 	shares: string; // BigInt as string
 	vault?: GraphQLVault;
+}
+
+/**
+ * Raw GraphQL semantic search result (snake_case from API)
+ * Returned by search_term() function with enhanced fields
+ */
+export interface GraphQLSemanticSearchResult {
+	atom: GraphQLAtom & {
+		cached_image?: {
+			url: string;
+			safe: boolean;
+		};
+		value?: {
+			json_object: {
+				description?: string;
+			};
+		};
+	};
 }
