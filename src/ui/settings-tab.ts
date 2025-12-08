@@ -6,6 +6,7 @@ import { App, PluginSettingTab, Setting } from 'obsidian';
 import IntuitionPlugin from '../main';
 import { NETWORKS, NetworkType } from '../types/networks';
 import { truncateAddress } from '../utils/helpers';
+import { UI_CONSTANTS, SETTING_NAMES, FEATURE_DESCRIPTIONS, PLACEHOLDER_MESSAGES } from '../types/constants';
 
 export class IntuitionSettingTab extends PluginSettingTab {
   plugin: IntuitionPlugin;
@@ -42,11 +43,11 @@ export class IntuitionSettingTab extends PluginSettingTab {
     containerEl.createEl('h2', { text: 'Network' });
 
     new Setting(containerEl)
-      .setName('Network')
+      .setName(SETTING_NAMES.NETWORK)
       .setDesc('Select Intuition network')
       .addDropdown(dropdown => dropdown
-        .addOption('testnet', 'Testnet (recommended for testing)')
-        .addOption('mainnet', 'Mainnet (real transactions)')
+        .addOption('testnet', UI_CONSTANTS.NETWORK_NAMES.testnet)
+        .addOption('mainnet', UI_CONSTANTS.NETWORK_NAMES.mainnet)
         .setValue(this.plugin.settings.network)
         .onChange(async (value: string) => {
           this.plugin.settings.network = value as NetworkType;
@@ -55,44 +56,62 @@ export class IntuitionSettingTab extends PluginSettingTab {
           this.display();
         }));
 
-    new Setting(containerEl)
-      .setName('Custom RPC URL')
-      .setDesc('Override default RPC URL (leave empty for default)')
-      .addText(text => text
-        .setPlaceholder('https://...')
-        .setValue(this.plugin.settings.customRpcUrl || '')
-        .onChange(async (value) => {
-          const trimmedValue = value.trim();
+    // Store previous valid value for reversion
+    let previousValidRpcUrl = this.plugin.settings.customRpcUrl || '';
 
-          // Validate if not empty
-          if (trimmedValue !== '') {
-            const validation = this.plugin.settingsService.validateRpcUrl(trimmedValue);
-            if (!validation.valid) {
-              this.plugin.noticeManager.error(validation.errors.join(', '));
-              return;
-            }
+    new Setting(containerEl)
+      .setName(SETTING_NAMES.CUSTOM_RPC)
+      .setDesc('Override default RPC URL (leave empty for default)')
+      .addText(text => {
+        text
+          .setPlaceholder('https://...')
+          .setValue(this.plugin.settings.customRpcUrl || '');
+
+        // Validate on blur instead of every keystroke
+        text.inputEl.addEventListener('blur', async () => {
+          const value = text.getValue().trim();
+
+          // Empty is valid (use default)
+          if (value === '') {
+            this.plugin.settings.customRpcUrl = null;
+            await this.plugin.saveSettings();
+            previousValidRpcUrl = '';
+            return;
           }
 
-          this.plugin.settings.customRpcUrl = trimmedValue || null;
+          // Validate non-empty values
+          const validation = this.plugin.settingsService.validateRpcUrl(value);
+          if (!validation.valid) {
+            this.plugin.noticeManager.error(validation.errors.join(', '));
+            // Revert to previous valid value
+            text.setValue(previousValidRpcUrl);
+            this.plugin.settings.customRpcUrl = previousValidRpcUrl || null;
+            return;
+          }
+
+          // Valid - save and update previous value
+          this.plugin.settings.customRpcUrl = value;
           await this.plugin.saveSettings();
-        }));
+          previousValidRpcUrl = value;
+        });
+      });
   }
 
   private addWalletSection(containerEl: HTMLElement): void {
     containerEl.createEl('h2', { text: 'Wallet' });
 
     const walletStatus = this.plugin.settings.wallet.hasWallet
-      ? `Connected: ${truncateAddress(this.plugin.settings.wallet.address || '', 6)}`
+      ? `Connected: ${truncateAddress(this.plugin.settings.wallet.address || '', UI_CONSTANTS.ADDRESS_TRUNCATE_LENGTH)}`
       : 'No wallet configured';
 
     new Setting(containerEl)
-      .setName('Wallet Status')
+      .setName(SETTING_NAMES.WALLET_STATUS)
       .setDesc(walletStatus)
       .addButton(button => button
         .setButtonText(this.plugin.settings.wallet.hasWallet ? 'Manage Wallet' : 'Setup Wallet')
         .onClick(() => {
           // Placeholder for Plan 003: Opens wallet setup modal
-          this.plugin.noticeManager.info('Wallet setup will be available in the next update');
+          this.plugin.noticeManager.info(PLACEHOLDER_MESSAGES.WALLET_SETUP);
         }));
   }
 
@@ -100,8 +119,8 @@ export class IntuitionSettingTab extends PluginSettingTab {
     containerEl.createEl('h2', { text: 'Features' });
 
     new Setting(containerEl)
-      .setName('Entity Decorations')
-      .setDesc('Show trust scores on entities in notes')
+      .setName(SETTING_NAMES.ENTITY_DECORATIONS)
+      .setDesc(FEATURE_DESCRIPTIONS.DECORATIONS)
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.features.enableDecorations)
         .onChange(async (value) => {
@@ -110,8 +129,8 @@ export class IntuitionSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('Hover Cards')
-      .setDesc('Show detailed info when hovering on entities')
+      .setName(SETTING_NAMES.HOVER_CARDS)
+      .setDesc(FEATURE_DESCRIPTIONS.HOVER_CARDS)
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.features.enableHoverCards)
         .onChange(async (value) => {
@@ -120,8 +139,8 @@ export class IntuitionSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('Claim Indicators')
-      .setDesc('Detect and verify claims in your notes')
+      .setName(SETTING_NAMES.CLAIM_INDICATORS)
+      .setDesc(FEATURE_DESCRIPTIONS.CLAIM_INDICATORS)
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.features.enableClaimIndicators)
         .onChange(async (value) => {
@@ -130,8 +149,8 @@ export class IntuitionSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('Offline Queue')
-      .setDesc('Queue transactions when offline')
+      .setName(SETTING_NAMES.OFFLINE_QUEUE)
+      .setDesc(FEATURE_DESCRIPTIONS.OFFLINE_QUEUE)
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.features.enableOfflineQueue)
         .onChange(async (value) => {
@@ -143,25 +162,38 @@ export class IntuitionSettingTab extends PluginSettingTab {
   private addUISection(containerEl: HTMLElement): void {
     containerEl.createEl('h2', { text: 'User Interface' });
 
+    // Store previous valid value for reversion
+    let previousValidStakeAmount = this.plugin.settings.ui.defaultStakeAmount;
+
     new Setting(containerEl)
-      .setName('Default Stake Amount')
+      .setName(SETTING_NAMES.DEFAULT_STAKE)
       .setDesc('Default amount in TRUST for new stakes')
-      .addText(text => text
-        .setValue(this.plugin.settings.ui.defaultStakeAmount)
-        .onChange(async (value) => {
+      .addText(text => {
+        text.setValue(this.plugin.settings.ui.defaultStakeAmount);
+
+        // Validate on blur instead of every keystroke
+        text.inputEl.addEventListener('blur', async () => {
+          const value = text.getValue();
           const validation = this.plugin.settingsService.validateStakeAmount(value);
+
           if (!validation.valid) {
             this.plugin.noticeManager.error(validation.errors.join(', '));
+            // Revert to previous valid value
+            text.setValue(previousValidStakeAmount);
+            this.plugin.settings.ui.defaultStakeAmount = previousValidStakeAmount;
             return;
           }
 
+          // Valid - save and update previous value
           this.plugin.settings.ui.defaultStakeAmount = value;
           await this.plugin.saveSettings();
-        }));
+          previousValidStakeAmount = value;
+        });
+      });
 
     new Setting(containerEl)
-      .setName('Show Stake Preview')
-      .setDesc('Show impact preview before staking')
+      .setName(SETTING_NAMES.STAKE_PREVIEW)
+      .setDesc(FEATURE_DESCRIPTIONS.STAKE_PREVIEW)
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.ui.showStakePreview)
         .onChange(async (value) => {
@@ -170,8 +202,8 @@ export class IntuitionSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('Annotate on Publish')
-      .setDesc('Add claim reference to note after publishing')
+      .setName(SETTING_NAMES.ANNOTATE_ON_PUBLISH)
+      .setDesc(FEATURE_DESCRIPTIONS.ANNOTATE_ON_PUBLISH)
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.ui.annotateOnPublish)
         .onChange(async (value) => {
@@ -180,11 +212,11 @@ export class IntuitionSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('Decoration Position')
+      .setName(SETTING_NAMES.DECORATION_POSITION)
       .setDesc('Where to display entity decorations')
       .addDropdown(dropdown => dropdown
-        .addOption('inline', 'Inline with text')
-        .addOption('gutter', 'In editor gutter')
+        .addOption('inline', UI_CONSTANTS.DECORATION_POSITIONS.inline)
+        .addOption('gutter', UI_CONSTANTS.DECORATION_POSITIONS.gutter)
         .setValue(this.plugin.settings.ui.decorationPosition)
         .onChange(async (value: string) => {
           this.plugin.settings.ui.decorationPosition = value as 'inline' | 'gutter';
@@ -198,7 +230,7 @@ export class IntuitionSettingTab extends PluginSettingTab {
     const network = NETWORKS[this.plugin.settings.network];
 
     new Setting(containerEl)
-      .setName('Current Network Info')
+      .setName(SETTING_NAMES.NETWORK_INFO)
       .setDesc(
         `Chain ID: ${network.chainId} | MultiVault: ${network.multiVaultAddress.slice(0, 10)}...`
       );
@@ -212,14 +244,14 @@ export class IntuitionSettingTab extends PluginSettingTab {
       .setDesc(this.plugin.settingsService.getEffectiveRpcUrl());
 
     new Setting(containerEl)
-      .setName('Clear Cache')
+      .setName(SETTING_NAMES.CLEAR_CACHE)
       .setDesc('Clear all cached data')
       .addButton(button => button
         .setButtonText('Clear Cache')
         .setWarning()
         .onClick(async () => {
           // Placeholder for Plan 008: Clear cache implementation
-          this.plugin.noticeManager.info('Cache clearing will be available once cache is implemented');
+          this.plugin.noticeManager.info(PLACEHOLDER_MESSAGES.CACHE_CLEAR);
         }));
   }
 }

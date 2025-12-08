@@ -9,6 +9,44 @@ export function formatTimestamp(timestamp: number): string {
 }
 
 /**
+ * Deep merges settings objects, ensuring nested properties are preserved
+ * Used during settings migration to prevent data loss when upgrading
+ * @param defaults - Default settings template
+ * @param saved - User's saved settings (may be partial/corrupted)
+ * @returns Merged settings with all required properties
+ */
+export function deepMergeSettings<T extends Record<string, any>>(
+	defaults: T,
+	saved: Partial<T>
+): T {
+	const result = { ...defaults };
+
+	for (const key in saved) {
+		if (saved.hasOwnProperty(key)) {
+			const savedValue = saved[key];
+			const defaultValue = defaults[key];
+
+			// If both are objects (and not null), merge recursively
+			if (
+				savedValue !== null &&
+				defaultValue !== null &&
+				typeof savedValue === 'object' &&
+				typeof defaultValue === 'object' &&
+				!Array.isArray(savedValue) &&
+				!Array.isArray(defaultValue)
+			) {
+				result[key] = deepMergeSettings(defaultValue, savedValue) as T[Extract<keyof T, string>];
+			} else {
+				// Primitive or null - use saved value
+				result[key] = savedValue as T[Extract<keyof T, string>];
+			}
+		}
+	}
+
+	return result;
+}
+
+/**
  * Truncates a wallet address for display purposes
  * Will be used in Plan 003 (Wallet Integration) and other UIs
  * @param address - The full address to truncate

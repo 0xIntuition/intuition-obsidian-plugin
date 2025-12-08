@@ -3,7 +3,7 @@
  */
 
 import { BaseService } from './base-service';
-import { IntuitionPluginSettings, NetworkConfig, NETWORKS } from '../types';
+import { IntuitionPluginSettings, NetworkConfig, NETWORKS, DEFAULT_SETTINGS, VALIDATION_ERRORS } from '../types';
 
 export interface ValidationResult {
   valid: boolean;
@@ -21,6 +21,60 @@ export class SettingsService extends BaseService {
   }
 
   /**
+   * Validates and auto-repairs settings, returning corrected settings
+   * This ensures corrupted settings are fixed automatically on load
+   * @param settings - Settings to validate
+   * @returns Validated and repaired settings
+   */
+  validateAndRepairSettings(settings: IntuitionPluginSettings): IntuitionPluginSettings {
+    const repaired = { ...settings };
+    let hadErrors = false;
+
+    // Validate network
+    if (!['testnet', 'mainnet'].includes(repaired.network)) {
+      repaired.network = 'testnet';
+      hadErrors = true;
+    }
+
+    // Validate custom RPC URL
+    if (repaired.customRpcUrl && repaired.customRpcUrl.trim() !== '') {
+      const validation = this.validateRpcUrl(repaired.customRpcUrl);
+      if (!validation.valid) {
+        repaired.customRpcUrl = null;
+        hadErrors = true;
+      }
+    }
+
+    // Validate stake amount
+    const stakeValidation = this.validateStakeAmount(repaired.ui.defaultStakeAmount);
+    if (!stakeValidation.valid) {
+      repaired.ui.defaultStakeAmount = DEFAULT_SETTINGS.ui.defaultStakeAmount;
+      hadErrors = true;
+    }
+
+    // Validate cache TTLs
+    ['atomTTL', 'vaultTTL', 'searchTTL'].forEach((key) => {
+      if (!this.validateCacheTTL(repaired.cache[key as keyof typeof repaired.cache] as number).valid) {
+        repaired.cache[key as keyof typeof repaired.cache] = DEFAULT_SETTINGS.cache[key as keyof typeof DEFAULT_SETTINGS.cache];
+        hadErrors = true;
+      }
+    });
+
+    // Validate cache size
+    if (repaired.cache.maxCacheSize <= 0) {
+      repaired.cache.maxCacheSize = DEFAULT_SETTINGS.cache.maxCacheSize;
+      hadErrors = true;
+    }
+
+    // Notify user if auto-repair occurred
+    if (hadErrors) {
+      this.plugin.noticeManager.warning(VALIDATION_ERRORS.SETTINGS_AUTO_REPAIRED);
+    }
+
+    return repaired;
+  }
+
+  /**
    * Validates entire settings object
    */
   validateSettings(settings: IntuitionPluginSettings): ValidationResult {
@@ -28,7 +82,7 @@ export class SettingsService extends BaseService {
 
     // Validate network
     if (!['testnet', 'mainnet'].includes(settings.network)) {
-      errors.push('Invalid network type');
+      errors.push(VALIDATION_ERRORS.NETWORK_INVALID);
     }
 
     // Validate custom RPC URL if provided
@@ -79,17 +133,17 @@ export class SettingsService extends BaseService {
     const errors: string[] = [];
 
     if (!url || url.trim() === '') {
-      errors.push('RPC URL cannot be empty');
+      errors.push(VALIDATION_ERRORS.RPC_URL_EMPTY);
       return { valid: false, errors };
     }
 
     try {
       const parsed = new URL(url);
       if (!['http:', 'https:'].includes(parsed.protocol)) {
-        errors.push('RPC URL must use http or https protocol');
+        errors.push(VALIDATION_ERRORS.RPC_URL_PROTOCOL);
       }
     } catch (e) {
-      errors.push('Invalid URL format');
+      errors.push(VALIDATION_ERRORS.RPC_URL_INVALID);
     }
 
     return {
@@ -105,15 +159,15 @@ export class SettingsService extends BaseService {
     const errors: string[] = [];
 
     if (!amount || amount.trim() === '') {
-      errors.push('Stake amount cannot be empty');
+      errors.push(VALIDATION_ERRORS.STAKE_EMPTY);
       return { valid: false, errors };
     }
 
     const numValue = parseFloat(amount);
     if (isNaN(numValue)) {
-      errors.push('Stake amount must be a valid number');
+      errors.push(VALIDATION_ERRORS.STAKE_INVALID);
     } else if (numValue <= 0) {
-      errors.push('Stake amount must be positive');
+      errors.push(VALIDATION_ERRORS.STAKE_POSITIVE);
     }
 
     return {
@@ -129,9 +183,9 @@ export class SettingsService extends BaseService {
     const errors: string[] = [];
 
     if (typeof ttl !== 'number' || isNaN(ttl)) {
-      errors.push('TTL must be a number');
+      errors.push(VALIDATION_ERRORS.TTL_INVALID);
     } else if (ttl <= 0) {
-      errors.push('TTL must be positive');
+      errors.push(VALIDATION_ERRORS.TTL_POSITIVE);
     }
 
     return {

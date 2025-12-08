@@ -4,11 +4,29 @@
 
 import { NetworkType } from './networks';
 
+/**
+ * Wallet settings with encrypted private key storage
+ *
+ * SECURITY WARNINGS:
+ * - Private keys are encrypted but stored on disk in Obsidian's data.json
+ * - data.json may sync to cloud services (Dropbox, iCloud, etc.)
+ * - Encryption uses browser's SubtleCrypto API with user-provided password
+ * - Password is NOT stored - lost password = lost access to wallet
+ * - For maximum security, consider hardware wallet or browser extension
+ * - This storage method is convenient but has inherent risks
+ * - Only store small amounts for testing/low-value transactions
+ *
+ * PLAN 003 CONSIDERATIONS:
+ * - Support for hardware wallets (Ledger, Trezor)
+ * - Support for browser extension wallets (MetaMask)
+ * - Option to store in system keychain instead
+ * - Multi-signature support for high-value operations
+ */
 export interface WalletSettings {
   hasWallet: boolean;
-  encryptedPrivateKey: string | null;
-  encryptionSalt: string | null;
-  address: string | null;
+  encryptedPrivateKey: string | null;  // AES-GCM encrypted, base64 encoded
+  encryptionSalt: string | null;        // Random salt for key derivation
+  address: string | null;               // Public address (not sensitive)
 }
 
 export interface FeatureFlags {
