@@ -55,7 +55,7 @@ export const NETWORKS: Record<NetworkType, NetworkConfig> = {
     name: 'Intuition Mainnet',
     rpcUrl: 'https://rpc.intuition.systems',
     explorerUrl: 'https://explorer.intuition.systems',
-    graphqlUrl: 'https://intuition.sh/v1/graphql',
+    graphqlUrl: 'https://mainnet.intuition.sh/v1/graphql',
     multiVaultAddress: '0x6E35cF57A41fA15eA0EaE9C33e751b01A784Fe7e',
   },
 };

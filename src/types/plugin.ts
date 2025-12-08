@@ -1,7 +1,3 @@
-export interface IntuitionPluginSettings {
-	initialized: boolean;
-}
-
-export const DEFAULT_SETTINGS: IntuitionPluginSettings = {
-	initialized: false,
-};
+// Re-export comprehensive settings from settings.ts
+export type { IntuitionPluginSettings } from './settings';
+export { DEFAULT_SETTINGS } from './settings';
