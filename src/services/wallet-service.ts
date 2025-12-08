@@ -25,6 +25,7 @@ export class WalletService extends BaseService {
 	private cryptoService: CryptoService;
 	private state: WalletState;
 	private unlockedWallet: UnlockedWallet | null = null;
+	private balanceRefreshPromise: Promise<bigint> | null = null;
 
 	constructor(plugin: IntuitionPlugin) {
 		super(plugin);
@@ -139,7 +140,18 @@ export class WalletService extends BaseService {
 			);
 		}
 
-		const account = privateKeyToAccount(privateKey);
+		// Validate private key cryptographically
+		let account;
+		try {
+			account = privateKeyToAccount(privateKey);
+		} catch (error) {
+			throw new PluginError(
+				'Invalid private key. Please check that your private key is a valid secp256k1 key.',
+				ErrorCode.INVALID_PRIVATE_KEY,
+				true,
+				error
+			);
+		}
 
 		// Encrypt and store
 		const encrypted = await this.cryptoService.encryptPrivateKey(
@@ -192,32 +204,17 @@ export class WalletService extends BaseService {
 		const rpcUrl =
 			this.plugin.settings.customRpcUrl || network.rpcUrl;
 
+		// Create shared chain configuration
+		const chainConfig = this.createChainConfig(network, rpcUrl);
+
 		// Create viem clients
 		const publicClient = createPublicClient({
-			chain: {
-				id: network.chainId,
-				name: network.name,
-				nativeCurrency: {
-					name: 'TRUST',
-					symbol: 'TRUST',
-					decimals: 18,
-				},
-				rpcUrls: { default: { http: [rpcUrl] } },
-			},
+			chain: chainConfig,
 			transport: http(rpcUrl),
 		});
 
 		const walletClient = createWalletClient({
-			chain: {
-				id: network.chainId,
-				name: network.name,
-				nativeCurrency: {
-					name: 'TRUST',
-					symbol: 'TRUST',
-					decimals: 18,
-				},
-				rpcUrls: { default: { http: [rpcUrl] } },
-			},
+			chain: chainConfig,
 			transport: http(rpcUrl),
 			account,
 		});
@@ -254,6 +251,9 @@ export class WalletService extends BaseService {
 			this.unlockedWallet = null;
 		}
 
+		// Clear any in-flight balance refresh
+		this.balanceRefreshPromise = null;
+
 		this.state.isUnlocked = false;
 		this.state.balance = null;
 		this.state.lastBalanceCheck = null;
@@ -288,7 +288,24 @@ export class WalletService extends BaseService {
 	}
 
 	/**
+	 * Get private key from unlocked wallet
+	 * @throws {PluginError} if wallet is locked
+	 * @returns {Hex} The private key
+	 */
+	getPrivateKey(): Hex {
+		if (!this.unlockedWallet) {
+			throw new PluginError(
+				WALLET_ERRORS.WALLET_LOCKED,
+				ErrorCode.WALLET_LOCKED,
+				true
+			);
+		}
+		return this.unlockedWallet.privateKey;
+	}
+
+	/**
 	 * Refresh balance from blockchain
+	 * Prevents concurrent requests by returning in-flight promise
 	 */
 	async refreshBalance(): Promise<bigint> {
 		if (!this.unlockedWallet) {
@@ -299,24 +316,37 @@ export class WalletService extends BaseService {
 			);
 		}
 
-		try {
-			const balance =
-				await this.unlockedWallet.publicClient.getBalance({
-					address: this.unlockedWallet.address,
-				});
-
-			this.state.balance = balance;
-			this.state.lastBalanceCheck = Date.now();
-
-			return balance;
-		} catch (error) {
-			throw new PluginError(
-				'Failed to fetch balance',
-				ErrorCode.NETWORK,
-				true,
-				error
-			);
+		// Return existing promise if refresh already in progress
+		if (this.balanceRefreshPromise) {
+			return this.balanceRefreshPromise;
 		}
+
+		// Create new refresh promise
+		this.balanceRefreshPromise = (async () => {
+			try {
+				const balance =
+					await this.unlockedWallet!.publicClient.getBalance({
+						address: this.unlockedWallet!.address,
+					});
+
+				this.state.balance = balance;
+				this.state.lastBalanceCheck = Date.now();
+
+				return balance;
+			} catch (error) {
+				throw new PluginError(
+					'Failed to fetch balance',
+					ErrorCode.NETWORK,
+					true,
+					error
+				);
+			} finally {
+				// Clear promise when done (success or failure)
+				this.balanceRefreshPromise = null;
+			}
+		})();
+
+		return this.balanceRefreshPromise;
 	}
 
 	/**
@@ -325,6 +355,23 @@ export class WalletService extends BaseService {
 	getFormattedBalance(): string {
 		if (this.state.balance === null) return '0';
 		return formatEther(this.state.balance);
+	}
+
+	/**
+	 * Create chain configuration for viem clients
+	 * @private
+	 */
+	private createChainConfig(network: typeof NETWORKS[keyof typeof NETWORKS], rpcUrl: string) {
+		return {
+			id: network.chainId,
+			name: network.name,
+			nativeCurrency: {
+				name: 'TRUST',
+				symbol: 'TRUST',
+				decimals: 18,
+			},
+			rpcUrls: { default: { http: [rpcUrl] } },
+		};
 	}
 
 	/**

@@ -35,6 +35,12 @@ export interface EncryptedKeyData {
 
 /**
  * Wallet lifecycle events
+ *
+ * NOTE: This type is currently unused but reserved for future event-driven
+ * wallet functionality. It will be used to implement an event emitter pattern
+ * for wallet state changes (initialization, locking, balance updates, etc.).
+ *
+ * @future This will be used with an EventEmitter or observable pattern
  */
 export type WalletEvent =
 	| { type: 'initialized'; address: Address }

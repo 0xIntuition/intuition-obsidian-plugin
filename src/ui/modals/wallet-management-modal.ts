@@ -3,6 +3,7 @@ import type IntuitionPlugin from '../../main';
 import { truncateAddress } from '../../utils/helpers';
 import { UnlockWalletModal } from './unlock-wallet-modal';
 import { WalletDeleteModal } from './wallet-delete-modal';
+import { WalletSetupModal } from './wallet-setup-modal';
 import { NETWORKS } from '../../types/networks';
 
 /**
@@ -28,6 +29,34 @@ export class WalletManagementModal extends Modal {
 		contentEl.addClass('intuition-wallet-management');
 
 		contentEl.createEl('h2', { text: 'Wallet Management' });
+
+		// Check if wallet exists
+		if (!this.plugin.settings.wallet.hasWallet) {
+			contentEl.createEl('p', {
+				text: 'No wallet found. Create or import a wallet to get started.',
+			});
+
+			// Setup Wallet button
+			new Setting(contentEl).addButton((button) =>
+				button
+					.setButtonText('Setup Wallet')
+					.setCta()
+					.onClick(() => {
+						new WalletSetupModal(
+							this.app,
+							this.plugin
+						).open();
+						this.close();
+					})
+			);
+
+			// Close button
+			new Setting(contentEl).addButton((button) =>
+				button.setButtonText('Close').onClick(() => this.close())
+			);
+
+			return;
+		}
 
 		const isUnlocked = this.plugin.walletService.isUnlocked();
 		const address = this.plugin.walletService.getAddress();
@@ -183,17 +212,8 @@ export class WalletManagementModal extends Modal {
 			// Verify password by attempting unlock (won't re-unlock if already unlocked)
 			await this.plugin.walletService.unlock(this.revealPassword);
 
-			// Get the private key from unlocked wallet
-			const unlockedWallet =
-				(this.plugin.walletService as any).unlockedWallet;
-			if (!unlockedWallet) {
-				this.plugin.noticeManager.error(
-					'Wallet is locked. Please unlock first.'
-				);
-				return;
-			}
-
-			const privateKey = unlockedWallet.privateKey;
+			// Get the private key using public API
+			const privateKey = this.plugin.walletService.getPrivateKey();
 
 			// Clear password immediately
 			this.revealPassword = '';
