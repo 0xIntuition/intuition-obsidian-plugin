@@ -1,7 +1,7 @@
 import { Plugin } from 'obsidian';
 import { IntuitionPluginSettings, DEFAULT_SETTINGS } from './types';
 import { NoticeManager, IntuitionSettingTab, WalletStatusBar } from './ui';
-import { SettingsService, WalletService } from './services';
+import { SettingsService, WalletService, IntuitionService } from './services';
 import { deepMergeSettings } from './utils';
 
 export default class IntuitionPlugin extends Plugin {
@@ -9,6 +9,7 @@ export default class IntuitionPlugin extends Plugin {
 	noticeManager: NoticeManager;
 	settingsService: SettingsService;
 	walletService: WalletService;
+	intuitionService: IntuitionService;
 	statusBarEl: HTMLElement;
 	walletStatusBar: WalletStatusBar;
 
@@ -27,6 +28,13 @@ export default class IntuitionPlugin extends Plugin {
 		// Initialize wallet service
 		this.walletService = new WalletService(this);
 		await this.walletService.initialize();
+
+		// Initialize Intuition service
+		this.intuitionService = new IntuitionService(
+			this,
+			this.walletService
+		);
+		await this.intuitionService.initialize();
 
 		// Add status bar
 		this.statusBarEl = this.addStatusBarItem();
@@ -54,6 +62,9 @@ export default class IntuitionPlugin extends Plugin {
 	onunload() {
 		if (this.walletStatusBar) {
 			this.walletStatusBar.unload();
+		}
+		if (this.intuitionService) {
+			this.intuitionService.cleanup();
 		}
 		if (this.walletService) {
 			this.walletService.cleanup();

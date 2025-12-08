@@ -59,3 +59,35 @@ export function truncateAddress(address: string, length = 6): string {
 	if (address.length <= length * 2) return address;
 	return `${address.slice(0, length)}...${address.slice(-length)}`;
 }
+
+/**
+ * Creates a deterministic cache key from an object by sorting keys alphabetically.
+ * This ensures that objects with the same properties produce identical cache keys
+ * regardless of property order.
+ *
+ * @param prefix - Cache key prefix (e.g., "search:", "atom:")
+ * @param obj - Object to serialize (filters, parameters, etc.)
+ * @returns Deterministic cache key string
+ *
+ * @example
+ * // Both produce the same key: "search:creatorId:0x123,label:test,type:Thing"
+ * createDeterministicCacheKey("search:", { label: "test", type: "Thing", creatorId: "0x123" })
+ * createDeterministicCacheKey("search:", { type: "Thing", creatorId: "0x123", label: "test" })
+ */
+export function createDeterministicCacheKey<T extends Record<string, any>>(
+	prefix: string,
+	obj: T
+): string {
+	// Filter out undefined values
+	const defined = Object.entries(obj).filter(([_, value]) => value !== undefined);
+
+	// Sort by key name for deterministic ordering
+	const sorted = defined.sort(([a], [b]) => a.localeCompare(b));
+
+	// Serialize to key:value pairs
+	const serialized = sorted
+		.map(([key, value]) => `${key}:${String(value)}`)
+		.join(',');
+
+	return `${prefix}${serialized}`;
+}
