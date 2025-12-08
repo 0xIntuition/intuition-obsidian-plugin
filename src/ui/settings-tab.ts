@@ -6,7 +6,14 @@ import { App, PluginSettingTab, Setting } from 'obsidian';
 import IntuitionPlugin from '../main';
 import { NETWORKS, NetworkType } from '../types/networks';
 import { truncateAddress } from '../utils/helpers';
-import { UI_CONSTANTS, SETTING_NAMES, FEATURE_DESCRIPTIONS, PLACEHOLDER_MESSAGES } from '../types/constants';
+import {
+	UI_CONSTANTS,
+	SETTING_NAMES,
+	FEATURE_DESCRIPTIONS,
+	PLACEHOLDER_MESSAGES,
+} from '../types/constants';
+import { WalletSetupModal } from './modals/wallet-setup-modal';
+import { WalletManagementModal } from './modals/wallet-management-modal';
 
 export class IntuitionSettingTab extends PluginSettingTab {
   plugin: IntuitionPlugin;
@@ -50,7 +57,20 @@ export class IntuitionSettingTab extends PluginSettingTab {
         .addOption('mainnet', UI_CONSTANTS.NETWORK_NAMES.mainnet)
         .setValue(this.plugin.settings.network)
         .onChange(async (value: string) => {
+          const oldNetwork = this.plugin.settings.network;
           this.plugin.settings.network = value as NetworkType;
+
+          // Lock wallet if network changed and unlocked
+          if (
+            oldNetwork !== value &&
+            this.plugin.walletService?.isUnlocked()
+          ) {
+            this.plugin.walletService.lock();
+            this.plugin.noticeManager.warning(
+              'Wallet locked due to network change. Please unlock to use new network.'
+            );
+          }
+
           await this.plugin.saveSettings();
           // Refresh display to update network info
           this.display();
@@ -100,19 +120,56 @@ export class IntuitionSettingTab extends PluginSettingTab {
   private addWalletSection(containerEl: HTMLElement): void {
     containerEl.createEl('h2', { text: 'Wallet' });
 
-    const walletStatus = this.plugin.settings.wallet.hasWallet
-      ? `Connected: ${truncateAddress(this.plugin.settings.wallet.address || '', UI_CONSTANTS.ADDRESS_TRUNCATE_LENGTH)}`
+    const hasWallet = this.plugin.settings.wallet.hasWallet;
+    const isUnlocked = this.plugin.walletService?.isUnlocked();
+    const address = this.plugin.settings.wallet.address;
+
+    // Wallet status
+    const statusDesc = hasWallet
+      ? `Address: ${truncateAddress(address || '', 6)}`
       : 'No wallet configured';
 
     new Setting(containerEl)
       .setName(SETTING_NAMES.WALLET_STATUS)
-      .setDesc(walletStatus)
-      .addButton(button => button
-        .setButtonText(this.plugin.settings.wallet.hasWallet ? 'Manage Wallet' : 'Setup Wallet')
-        .onClick(() => {
-          // Placeholder for Plan 003: Opens wallet setup modal
-          this.plugin.noticeManager.info(PLACEHOLDER_MESSAGES.WALLET_SETUP);
-        }));
+      .setDesc(statusDesc)
+      .addButton((button) =>
+        button
+          .setButtonText(hasWallet ? 'Manage Wallet' : 'Setup Wallet')
+          .onClick(() => {
+            if (hasWallet) {
+              new WalletManagementModal(this.app, this.plugin).open();
+            } else {
+              new WalletSetupModal(this.app, this.plugin).open();
+            }
+          })
+      );
+
+    // Balance display (if wallet exists)
+    if (hasWallet) {
+      const balance = isUnlocked
+        ? this.plugin.walletService.getFormattedBalance() + ' TRUST'
+        : 'Locked';
+
+      new Setting(containerEl)
+        .setName('Balance')
+        .setDesc(balance)
+        .addButton((button) =>
+          button
+            .setButtonText('Refresh')
+            .setDisabled(!isUnlocked)
+            .onClick(async () => {
+              try {
+                await this.plugin.walletService.refreshBalance();
+                this.plugin.noticeManager.success('Balance refreshed');
+                this.display();
+              } catch (error) {
+                this.plugin.noticeManager.error(
+                  `Failed to refresh: ${error.message}`
+                );
+              }
+            })
+        );
+    }
   }
 
   private addFeaturesSection(containerEl: HTMLElement): void {

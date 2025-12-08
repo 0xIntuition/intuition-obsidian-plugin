@@ -17,8 +17,8 @@ The Intuition Obsidian Plugin integrates [Intuition](https://intuition.systems) 
 The plugin is under active development with 12 implementation plans:
 
 1. **Project Foundation** ✅ - Core architecture and plugin setup
-2. **Settings System** - Configurable plugin options
-3. **Embedded Wallet** - Secure wallet integration with key management
+2. **Settings System** ✅ - Configurable plugin options
+3. **Embedded Wallet** ✅ - Secure wallet integration with key management
 4. **SDK Integration** - Connection to Intuition's protocol via SDK
 5. **Atom Search** - Search and browse the global knowledge graph
 6. **Claim Modal** - UI for creating and publishing claims
