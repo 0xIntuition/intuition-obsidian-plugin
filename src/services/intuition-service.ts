@@ -13,6 +13,7 @@ import type { Address } from 'viem';
 import { BaseService } from './base-service';
 import { GraphQLClient } from './graphql-client';
 import { CacheService } from './cache-service';
+import { createDeterministicCacheKey } from '../utils/helpers';
 import {
 	AtomData,
 	AtomType,
@@ -275,8 +276,9 @@ export class IntuitionService extends BaseService {
 	async searchAtoms(filters: AtomSearchFilters = {}): Promise<AtomData[]> {
 		const { label, type, creatorId, limit = 10, offset = 0 } = filters;
 
-		// Create cache key from filters
-		const cacheKey = `search:${JSON.stringify(filters)}`;
+		// Create deterministic cache key to ensure identical queries hit the cache
+		// regardless of property order in the filters object
+		const cacheKey = createDeterministicCacheKey('search:', filters);
 
 		// Check cache
 		const cached = this.cacheService.get<AtomData[]>(cacheKey);
@@ -546,7 +548,11 @@ export class IntuitionService extends BaseService {
 		const totalShares = BigInt(vault.total_shares);
 		const currentSharePrice = BigInt(vault.current_share_price);
 
-		// Calculate total assets: shares * price / 1e18
+		// Calculate total assets in wei: (shares * sharePrice) / 1e18
+		// Note: BigInt division truncates toward zero, discarding fractional wei.
+		// This is acceptable for display purposes as the precision loss is minimal
+		// (max ~0.000000000000000001 ETH = 1 wei per calculation).
+		// Example: 1000 shares * 1.5e18 price/share = 1500e18 / 1e18 = 1500 wei
 		const totalAssets = (totalShares * currentSharePrice) / BigInt(1e18);
 
 		return {
@@ -563,10 +569,13 @@ export class IntuitionService extends BaseService {
 	private mapPosition(position: GraphQLPosition): PositionData {
 		const shares = BigInt(position.shares);
 
-		// Calculate position value if vault data available
+		// Calculate position value in wei if vault data available
 		let value = BigInt(0);
 		if (position.vault) {
 			const sharePrice = BigInt(position.vault.current_share_price);
+			// Note: BigInt division truncates toward zero, discarding fractional wei.
+			// This is acceptable for display purposes as the precision loss is minimal
+			// (max ~0.000000000000000001 ETH = 1 wei per calculation).
 			value = (shares * sharePrice) / BigInt(1e18);
 		}
 
