@@ -67,6 +67,20 @@ export const FEATURE_DESCRIPTIONS = {
 } as const;
 
 export const PLACEHOLDER_MESSAGES = {
-	WALLET_SETUP: 'Wallet setup will be available in the next update',
 	CACHE_CLEAR: 'Cache clearing will be available once cache is implemented',
+} as const;
+
+// Wallet Error Messages
+export const WALLET_ERRORS = {
+	NO_WALLET: 'No wallet configured. Please setup a wallet first.',
+	WALLET_LOCKED: 'Wallet is locked. Please unlock to continue.',
+	INVALID_PASSWORD: 'Incorrect password. Please try again.',
+	INVALID_PRIVATE_KEY:
+		'Invalid private key format. Must be 66 characters starting with 0x.',
+	PASSWORD_MISMATCH: 'Passwords do not match.',
+	PASSWORD_TOO_SHORT: 'Password must be at least 8 characters.',
+	ENCRYPTION_FAILED: 'Failed to encrypt wallet. Please try again.',
+	DECRYPTION_FAILED:
+		'Failed to decrypt wallet. Your password may be incorrect.',
+	ALREADY_EXISTS: 'Wallet already exists. Delete existing wallet first.',
 } as const;

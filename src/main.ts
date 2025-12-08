@@ -1,13 +1,16 @@
 import { Plugin } from 'obsidian';
 import { IntuitionPluginSettings, DEFAULT_SETTINGS } from './types';
-import { NoticeManager, IntuitionSettingTab } from './ui';
-import { SettingsService } from './services';
+import { NoticeManager, IntuitionSettingTab, WalletStatusBar } from './ui';
+import { SettingsService, WalletService } from './services';
 import { deepMergeSettings } from './utils';
 
 export default class IntuitionPlugin extends Plugin {
 	settings: IntuitionPluginSettings;
 	noticeManager: NoticeManager;
 	settingsService: SettingsService;
+	walletService: WalletService;
+	statusBarEl: HTMLElement;
+	walletStatusBar: WalletStatusBar;
 
 	async onload() {
 		await this.loadSettings();
@@ -20,6 +23,15 @@ export default class IntuitionPlugin extends Plugin {
 		// Validate and repair settings after service is available
 		this.settings = this.settingsService.validateAndRepairSettings(this.settings);
 		await this.saveSettings();
+
+		// Initialize wallet service
+		this.walletService = new WalletService(this);
+		await this.walletService.initialize();
+
+		// Add status bar
+		this.statusBarEl = this.addStatusBarItem();
+		this.walletStatusBar = new WalletStatusBar(this, this.statusBarEl);
+		this.walletStatusBar.load();
 
 		// Register settings tab
 		this.addSettingTab(new IntuitionSettingTab(this.app, this));
@@ -40,6 +52,12 @@ export default class IntuitionPlugin extends Plugin {
 	}
 
 	onunload() {
+		if (this.walletStatusBar) {
+			this.walletStatusBar.unload();
+		}
+		if (this.walletService) {
+			this.walletService.cleanup();
+		}
 		if (this.settingsService) {
 			this.settingsService.cleanup();
 		}
