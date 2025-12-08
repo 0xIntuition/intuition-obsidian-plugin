@@ -33,8 +33,7 @@ src/
     notice-manager.ts        # Notification helper
   utils/
     index.ts                 # Utility exports
-    constants.ts             # Plugin constants
-    helpers.ts               # Common helpers
+    helpers.ts               # Common helpers (address truncation, timestamps)
 ```
 
 ### Files to Modify
@@ -48,14 +47,14 @@ src/
 ```typescript
 // src/types/plugin.ts
 export interface IntuitionPluginSettings {
-  version: string;
   initialized: boolean;
 }
 
 export const DEFAULT_SETTINGS: IntuitionPluginSettings = {
-  version: '1.0.0',
   initialized: false,
 };
+
+// Note: Version field removed during PR feedback - use manifest.version instead
 
 // src/types/errors.ts
 export enum ErrorCode {
@@ -71,6 +70,25 @@ export interface IntuitionError {
   message: string;
   details?: unknown;
   recoverable: boolean;
+}
+
+export class PluginError extends Error implements IntuitionError {
+  code: ErrorCode;
+  details?: unknown;
+  recoverable: boolean;
+
+  constructor(
+    message: string,
+    code: ErrorCode = ErrorCode.UNKNOWN,
+    recoverable = false,
+    details?: unknown
+  ) {
+    super(message);
+    this.name = 'PluginError';
+    this.code = code;
+    this.recoverable = recoverable;
+    this.details = details;
+  }
 }
 
 // src/services/base-service.ts
@@ -156,12 +174,9 @@ export default class IntuitionPlugin extends Plugin {
         this.noticeManager.info('Claim publishing coming soon');
       }
     });
-
-    console.log('Intuition plugin loaded');
   }
 
   onunload() {
-    console.log('Intuition plugin unloaded');
   }
 
   async loadSettings() {

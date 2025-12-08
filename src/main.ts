@@ -23,12 +23,9 @@ export default class IntuitionPlugin extends Plugin {
 				this.noticeManager.info('Claim publishing coming soon');
 			}
 		});
-
-		console.log('Intuition plugin loaded');
 	}
 
 	onunload() {
-		console.log('Intuition plugin unloaded');
 	}
 
 	async loadSettings() {
