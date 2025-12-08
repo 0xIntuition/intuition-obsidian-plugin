@@ -83,6 +83,6 @@ export function mergeSearchResults(
 		}
 
 		// Tiebreaker: timestamp (newer first)
-		return b.item.blockTimestamp - a.item.blockTimestamp;
+		return b.item.createdAt - a.item.createdAt;
 	});
 }
