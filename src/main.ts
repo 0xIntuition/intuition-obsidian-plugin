@@ -1,14 +1,23 @@
 import { Plugin } from 'obsidian';
 import { IntuitionPluginSettings, DEFAULT_SETTINGS } from './types';
-import { NoticeManager } from './ui/notice-manager';
+import { NoticeManager, IntuitionSettingTab } from './ui';
+import { SettingsService } from './services';
 
 export default class IntuitionPlugin extends Plugin {
 	settings: IntuitionPluginSettings;
 	noticeManager: NoticeManager;
+	settingsService: SettingsService;
 
 	async onload() {
 		await this.loadSettings();
 		this.noticeManager = new NoticeManager();
+
+		// Initialize settings service
+		this.settingsService = new SettingsService(this);
+		await this.settingsService.initialize();
+
+		// Register settings tab
+		this.addSettingTab(new IntuitionSettingTab(this.app, this));
 
 		// Register ribbon icon
 		this.addRibbonIcon('network', 'Intuition', () => {
@@ -26,6 +35,9 @@ export default class IntuitionPlugin extends Plugin {
 	}
 
 	onunload() {
+		if (this.settingsService) {
+			this.settingsService.cleanup();
+		}
 	}
 
 	async loadSettings() {

@@ -1,160 +1,11 @@
-# Plan 002: Settings & Configuration System
+/**
+ * Settings tab UI
+ */
 
-## Objective
-Implement a comprehensive settings system supporting network selection (Testnet/Mainnet), API endpoints, and feature toggles.
-
-## Prerequisites
-- Plan 001 (Project Foundation)
-
-## Deliverables
-1. Settings interface with all configuration options
-2. Settings tab UI with organized sections
-3. Network configuration (chain IDs, RPC URLs, contract addresses)
-4. Feature toggles for optional functionality
-5. Settings validation and migration system
-
-## Files to Create
-
-```
-src/
-  types/
-    settings.ts              # Settings interfaces
-    networks.ts              # Network configuration types
-  services/
-    settings-service.ts      # Settings management
-  ui/
-    settings-tab.ts          # Settings tab UI
-```
-
-## Data Models
-
-```typescript
-// src/types/networks.ts
-export type NetworkType = 'testnet' | 'mainnet';
-
-export interface NetworkConfig {
-  chainId: number;
-  name: string;
-  rpcUrl: string;
-  explorerUrl: string;
-  graphqlUrl: string;
-  multiVaultAddress: `0x${string}`;
-}
-
-export const NETWORKS: Record<NetworkType, NetworkConfig> = {
-  testnet: {
-    chainId: 13579,
-    name: 'Intuition Testnet',
-    rpcUrl: 'https://testnet.rpc.intuition.systems',
-    explorerUrl: 'https://testnet.explorer.intuition.systems',
-    graphqlUrl: 'https://testnet.intuition.sh/v1/graphql',
-    multiVaultAddress: '0x2Ece8D4dEdcB9918A398528f3fa4688b1d2CAB91',
-  },
-  mainnet: {
-    chainId: 1155,
-    name: 'Intuition Mainnet',
-    rpcUrl: 'https://rpc.intuition.systems',
-    explorerUrl: 'https://explorer.intuition.systems',
-    graphqlUrl: 'https://mainnet.intuition.sh/v1/graphql',
-    multiVaultAddress: '0x6E35cF57A41fA15eA0EaE9C33e751b01A784Fe7e',
-  },
-};
-
-// src/types/settings.ts
-export interface WalletSettings {
-  hasWallet: boolean;
-  encryptedPrivateKey: string | null;
-  encryptionSalt: string | null;
-  address: string | null;
-}
-
-export interface FeatureFlags {
-  enableDecorations: boolean;
-  enableHoverCards: boolean;
-  enableClaimIndicators: boolean;
-  enableOfflineQueue: boolean;
-}
-
-export interface CacheSettings {
-  atomTTL: number;      // ms, default 3600000 (1 hour)
-  vaultTTL: number;     // ms, default 300000 (5 min)
-  searchTTL: number;    // ms, default 600000 (10 min)
-  maxCacheSize: number; // bytes, default 50MB
-}
-
-export interface UISettings {
-  defaultStakeAmount: string;
-  showStakePreview: boolean;
-  annotateOnPublish: boolean;
-  decorationPosition: 'inline' | 'gutter';
-}
-
-export interface IntuitionPluginSettings {
-  version: string;
-  initialized: boolean;
-
-  // Network
-  network: NetworkType;
-  customRpcUrl: string | null;
-
-  // Wallet (encrypted data)
-  wallet: WalletSettings;
-
-  // Features
-  features: FeatureFlags;
-
-  // Cache
-  cache: CacheSettings;
-
-  // UI preferences
-  ui: UISettings;
-}
-
-export const DEFAULT_SETTINGS: IntuitionPluginSettings = {
-  version: '1.0.0',
-  initialized: false,
-
-  network: 'testnet',
-  customRpcUrl: null,
-
-  wallet: {
-    hasWallet: false,
-    encryptedPrivateKey: null,
-    encryptionSalt: null,
-    address: null,
-  },
-
-  features: {
-    enableDecorations: true,
-    enableHoverCards: true,
-    enableClaimIndicators: false,
-    enableOfflineQueue: true,
-  },
-
-  cache: {
-    atomTTL: 3600000,
-    vaultTTL: 300000,
-    searchTTL: 600000,
-    maxCacheSize: 50 * 1024 * 1024,
-  },
-
-  ui: {
-    defaultStakeAmount: '0.001',
-    showStakePreview: true,
-    annotateOnPublish: true,
-    decorationPosition: 'inline',
-  },
-};
-```
-
-## Implementation
-
-### Settings Tab UI (src/ui/settings-tab.ts)
-
-```typescript
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import IntuitionPlugin from '../main';
 import { NETWORKS, NetworkType } from '../types/networks';
+import { truncateAddress } from '../utils/helpers';
 
 export class IntuitionSettingTab extends PluginSettingTab {
   plugin: IntuitionPlugin;
@@ -197,9 +48,11 @@ export class IntuitionSettingTab extends PluginSettingTab {
         .addOption('testnet', 'Testnet (recommended for testing)')
         .addOption('mainnet', 'Mainnet (real transactions)')
         .setValue(this.plugin.settings.network)
-        .onChange(async (value: NetworkType) => {
-          this.plugin.settings.network = value;
+        .onChange(async (value: string) => {
+          this.plugin.settings.network = value as NetworkType;
           await this.plugin.saveSettings();
+          // Refresh display to update network info
+          this.display();
         }));
 
     new Setting(containerEl)
@@ -209,7 +62,18 @@ export class IntuitionSettingTab extends PluginSettingTab {
         .setPlaceholder('https://...')
         .setValue(this.plugin.settings.customRpcUrl || '')
         .onChange(async (value) => {
-          this.plugin.settings.customRpcUrl = value || null;
+          const trimmedValue = value.trim();
+
+          // Validate if not empty
+          if (trimmedValue !== '') {
+            const validation = this.plugin.settingsService.validateRpcUrl(trimmedValue);
+            if (!validation.valid) {
+              this.plugin.noticeManager.error(validation.errors.join(', '));
+              return;
+            }
+          }
+
+          this.plugin.settings.customRpcUrl = trimmedValue || null;
           await this.plugin.saveSettings();
         }));
   }
@@ -218,7 +82,7 @@ export class IntuitionSettingTab extends PluginSettingTab {
     containerEl.createEl('h2', { text: 'Wallet' });
 
     const walletStatus = this.plugin.settings.wallet.hasWallet
-      ? `Connected: ${this.plugin.settings.wallet.address?.slice(0, 6)}...${this.plugin.settings.wallet.address?.slice(-4)}`
+      ? `Connected: ${truncateAddress(this.plugin.settings.wallet.address || '', 6)}`
       : 'No wallet configured';
 
     new Setting(containerEl)
@@ -227,7 +91,8 @@ export class IntuitionSettingTab extends PluginSettingTab {
       .addButton(button => button
         .setButtonText(this.plugin.settings.wallet.hasWallet ? 'Manage Wallet' : 'Setup Wallet')
         .onClick(() => {
-          // Opens wallet setup modal (Plan 003)
+          // Placeholder for Plan 003: Opens wallet setup modal
+          this.plugin.noticeManager.info('Wallet setup will be available in the next update');
         }));
   }
 
@@ -284,6 +149,12 @@ export class IntuitionSettingTab extends PluginSettingTab {
       .addText(text => text
         .setValue(this.plugin.settings.ui.defaultStakeAmount)
         .onChange(async (value) => {
+          const validation = this.plugin.settingsService.validateStakeAmount(value);
+          if (!validation.valid) {
+            this.plugin.noticeManager.error(validation.errors.join(', '));
+            return;
+          }
+
           this.plugin.settings.ui.defaultStakeAmount = value;
           await this.plugin.saveSettings();
         }));
@@ -307,6 +178,18 @@ export class IntuitionSettingTab extends PluginSettingTab {
           this.plugin.settings.ui.annotateOnPublish = value;
           await this.plugin.saveSettings();
         }));
+
+    new Setting(containerEl)
+      .setName('Decoration Position')
+      .setDesc('Where to display entity decorations')
+      .addDropdown(dropdown => dropdown
+        .addOption('inline', 'Inline with text')
+        .addOption('gutter', 'In editor gutter')
+        .setValue(this.plugin.settings.ui.decorationPosition)
+        .onChange(async (value: string) => {
+          this.plugin.settings.ui.decorationPosition = value as 'inline' | 'gutter';
+          await this.plugin.saveSettings();
+        }));
   }
 
   private addAdvancedSection(containerEl: HTMLElement): void {
@@ -316,7 +199,17 @@ export class IntuitionSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Current Network Info')
-      .setDesc(`Chain ID: ${network.chainId} | MultiVault: ${network.multiVaultAddress.slice(0, 10)}...`);
+      .setDesc(
+        `Chain ID: ${network.chainId} | MultiVault: ${network.multiVaultAddress.slice(0, 10)}...`
+      );
+
+    new Setting(containerEl)
+      .setName('GraphQL Endpoint')
+      .setDesc(network.graphqlUrl);
+
+    new Setting(containerEl)
+      .setName('RPC Endpoint')
+      .setDesc(this.plugin.settingsService.getEffectiveRpcUrl());
 
     new Setting(containerEl)
       .setName('Clear Cache')
@@ -325,29 +218,8 @@ export class IntuitionSettingTab extends PluginSettingTab {
         .setButtonText('Clear Cache')
         .setWarning()
         .onClick(async () => {
-          // Clear cache implementation
+          // Placeholder for Plan 008: Clear cache implementation
+          this.plugin.noticeManager.info('Cache clearing will be available once cache is implemented');
         }));
   }
 }
-```
-
-## Acceptance Criteria
-- [ ] Settings tab displays all configuration sections
-- [ ] Network dropdown shows Testnet/Mainnet options
-- [ ] Network change updates displayed info
-- [ ] Custom RPC URL field saves correctly
-- [ ] Feature toggles persist between sessions
-- [ ] UI settings save and load correctly
-- [ ] Settings validation prevents invalid values
-- [ ] Clear cache button works
-
-## Testing
-1. Open Obsidian settings
-2. Navigate to Intuition plugin settings
-3. Change network to Mainnet, verify info updates
-4. Toggle each feature flag, reload plugin, verify persistence
-5. Change default stake amount, verify it persists
-6. Enter invalid RPC URL, verify validation
-
-## Estimated Effort
-Low - Standard Obsidian settings pattern
