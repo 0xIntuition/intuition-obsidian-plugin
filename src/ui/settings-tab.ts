@@ -14,6 +14,7 @@ import {
 } from '../types/constants';
 import { WalletSetupModal } from './modals/wallet-setup-modal';
 import { WalletManagementModal } from './modals/wallet-management-modal';
+import { LLMSettingsComponent } from './components/llm-settings';
 
 export class IntuitionSettingTab extends PluginSettingTab {
   plugin: IntuitionPlugin;
@@ -35,6 +36,9 @@ export class IntuitionSettingTab extends PluginSettingTab {
 
     // Wallet Section
     this.addWalletSection(containerEl);
+
+    // LLM Section
+    this.addLLMSection(containerEl);
 
     // Features Section
     this.addFeaturesSection(containerEl);
@@ -170,6 +174,11 @@ export class IntuitionSettingTab extends PluginSettingTab {
             })
         );
     }
+  }
+
+  private addLLMSection(containerEl: HTMLElement): void {
+    const llmSettings = new LLMSettingsComponent(this.plugin, containerEl);
+    llmSettings.render();
   }
 
   private addFeaturesSection(containerEl: HTMLElement): void {

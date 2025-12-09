@@ -26,6 +26,15 @@ The Intuition Obsidian Plugin integrates [Intuition](https://intuition.systems) 
   - Consensus display for existing claims (FOR/AGAINST percentages)
   - Validation and error handling
   - Hotkey support (Cmd/Ctrl+Shift+I)
+- **LLM Integration (Core Infrastructure)**: Foundational AI capabilities
+  - Multi-provider support (Anthropic, OpenAI, OpenRouter, Google AI)
+  - Secure encrypted API key storage with password protection
+  - Usage tracking and cost management with monthly budgets
+  - Rate limiting and prompt injection protection
+  - Auto-lock security feature (30-minute timeout)
+  - Cost estimation and budget warnings
+  - Custom endpoint support for proxies/corporate setups
+  - Feature toggles for individual LLM capabilities
 
 ### Planned
 The plugin is under active development with 12 implementation plans:
@@ -36,6 +45,7 @@ The plugin is under active development with 12 implementation plans:
 4. **SDK Integration** ✅ - Connection to Intuition's protocol via GraphQL
 5. **Atom Search** ✅ - Search and browse the global knowledge graph with AI-powered semantic search
 6. **Claim Modal** ✅ - UI for structuring claims as triples with existence checking and consensus display
+6-2. **LLM Service** ✅ - Core infrastructure for AI-powered features (multi-provider support, encryption, cost tracking)
 7. **Publishing Flow** - Submit claims to the blockchain
 8. **Offline Queue** - Queue claims when offline
 9. **Entity Decorations** - Highlight linked entities in your notes
@@ -124,7 +134,7 @@ This project follows a phased implementation approach. Check the `plans/` direct
 - Implementation order and dependencies
 - Acceptance criteria and testing requirements
 
-Current status: **Plans 001-006 Complete** (Foundation, Settings, Wallet, SDK Integration, Atom Search, Claim Modal)
+Current status: **Plans 001-006, 006-2a Complete** (Foundation, Settings, Wallet, SDK Integration, Atom Search, Claim Modal, LLM Service)
 
 ## Contributing
 

@@ -6,4 +6,7 @@ export * from './modals/wallet-setup-modal';
 export * from './modals/unlock-wallet-modal';
 export * from './modals/wallet-management-modal';
 export * from './modals/wallet-delete-modal';
+export * from './modals/api-key-modal';
+export * from './modals/unlock-llm-modal';
 export * from './components/wallet-status';
+export * from './components/llm-settings';

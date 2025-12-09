@@ -13,6 +13,12 @@ export enum ErrorCode {
 	ENCRYPTION_ERROR = 'ENCRYPTION_ERROR',
 	INVALID_PASSWORD = 'INVALID_PASSWORD',
 	INVALID_PRIVATE_KEY = 'INVALID_PRIVATE_KEY',
+	// LLM-specific errors
+	LLM = 'LLM',
+	LLM_API_KEY_LOCKED = 'LLM_API_KEY_LOCKED',
+	LLM_RATE_LIMIT = 'LLM_RATE_LIMIT',
+	LLM_BUDGET_EXCEEDED = 'LLM_BUDGET_EXCEEDED',
+	LLM_PROVIDER_ERROR = 'LLM_PROVIDER_ERROR',
 }
 
 export interface IntuitionError {
@@ -20,6 +26,11 @@ export interface IntuitionError {
 	message: string;
 	details?: unknown;
 	recoverable: boolean;
+}
+
+export interface ValidationResult {
+	valid: boolean;
+	errors: string[];
 }
 
 export class PluginError extends Error implements IntuitionError {

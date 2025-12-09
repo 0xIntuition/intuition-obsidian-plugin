@@ -3,6 +3,7 @@ export * from './constants';
 export * from './errors';
 export * from './graphql';
 export * from './intuition';
+export * from './llm';
 export * from './networks';
 export * from './plugin';
 export * from './search';

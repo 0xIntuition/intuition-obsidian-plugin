@@ -3,6 +3,7 @@
  */
 
 import { NetworkType } from './networks';
+import { LLMProvider, LLMUsageStats } from './llm';
 
 /**
  * Wallet settings with encrypted private key storage
@@ -50,6 +51,45 @@ export interface UISettings {
   decorationPosition: 'inline' | 'gutter';
 }
 
+/**
+ * LLM (AI) settings
+ *
+ * SECURITY WARNINGS:
+ * - API keys are encrypted but stored on disk in Obsidian's data.json
+ * - data.json may sync to cloud services (Dropbox, iCloud, etc.)
+ * - Encryption uses browser's SubtleCrypto API with user-provided password
+ * - Password is NOT stored - lost password = lost access to API key
+ * - Only use for testing/low-value API keys
+ * - Auto-locks after 30 minutes of inactivity
+ */
+export interface LLMSettings {
+  enabled: boolean;
+  provider: LLMProvider;
+  modelId: string;
+  encryptedApiKey: string | null;  // JSON.stringify(EncryptedKeyData)
+  encryptionSalt: string | null;
+  customBaseUrl: string | null;
+  costManagement: {
+    trackUsage: boolean;              // Default: false (opt-in)
+    monthlyBudgetUSD: number | null;  // Default: null (unlimited)
+    warningThresholdPercent: number;  // Default: 80
+    requireConfirmation: boolean;     // Default: false
+  };
+  usageStats: LLMUsageStats;
+  features: {
+    claimExtraction: boolean;         // Default: true
+    entityDisambiguation: boolean;    // Default: true (not used in 006-2a)
+    predicateSuggestion: boolean;     // Default: true (not used in 006-2a)
+    batchAnalysis: boolean;           // Default: true (not used in 006-2a)
+    knowledgeQA: boolean;             // Default: true (not used in 006-2a)
+    claimImprovement: boolean;        // Default: true (not used in 006-2a)
+    autoTagging: boolean;             // Default: true (not used in 006-2a)
+    relationshipDiscovery: boolean;   // Default: true (not used in 006-2a)
+    summaryGeneration: boolean;       // Default: true (not used in 006-2a)
+    factChecking: boolean;            // Default: true (not used in 006-2a)
+  };
+}
+
 export interface IntuitionPluginSettings {
   version: string;
   initialized: boolean;
@@ -69,7 +109,45 @@ export interface IntuitionPluginSettings {
 
   // UI preferences
   ui: UISettings;
+
+  // LLM (AI) settings
+  llm: LLMSettings;
 }
+
+export const DEFAULT_LLM_SETTINGS: LLMSettings = {
+  enabled: false,
+  provider: 'anthropic',
+  modelId: 'claude-haiku-3-5-20241022',
+  encryptedApiKey: null,
+  encryptionSalt: null,
+  customBaseUrl: null,
+  costManagement: {
+    trackUsage: false,
+    monthlyBudgetUSD: null,
+    warningThresholdPercent: 80,
+    requireConfirmation: false,
+  },
+  usageStats: {
+    totalRequests: 0,
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+    totalCostUSD: 0,
+    requestsByModel: {},
+    lastReset: Date.now(),
+  },
+  features: {
+    claimExtraction: true,
+    entityDisambiguation: true,
+    predicateSuggestion: true,
+    batchAnalysis: true,
+    knowledgeQA: true,
+    claimImprovement: true,
+    autoTagging: true,
+    relationshipDiscovery: true,
+    summaryGeneration: true,
+    factChecking: true,
+  },
+};
 
 export const DEFAULT_SETTINGS: IntuitionPluginSettings = {
   version: '1.0.0',
@@ -105,4 +183,6 @@ export const DEFAULT_SETTINGS: IntuitionPluginSettings = {
     annotateOnPublish: true,
     decorationPosition: 'inline',
   },
+
+  llm: DEFAULT_LLM_SETTINGS,
 };
