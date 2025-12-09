@@ -321,13 +321,15 @@ export class WalletService extends BaseService {
 			return this.balanceRefreshPromise;
 		}
 
+		// Capture wallet reference for use in async context
+		const wallet = this.unlockedWallet;
+
 		// Create new refresh promise
 		this.balanceRefreshPromise = (async () => {
 			try {
-				const balance =
-					await this.unlockedWallet!.publicClient.getBalance({
-						address: this.unlockedWallet!.address,
-					});
+				const balance = await wallet.publicClient.getBalance({
+					address: wallet.address,
+				});
 
 				this.state.balance = balance;
 				this.state.lastBalanceCheck = Date.now();

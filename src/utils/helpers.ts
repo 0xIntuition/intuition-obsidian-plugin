@@ -15,7 +15,7 @@ export function formatTimestamp(timestamp: number): string {
  * @param saved - User's saved settings (may be partial/corrupted)
  * @returns Merged settings with all required properties
  */
-export function deepMergeSettings<T extends Record<string, any>>(
+export function deepMergeSettings<T extends Record<string, unknown>>(
 	defaults: T,
 	saved: Partial<T>
 ): T {
@@ -74,7 +74,7 @@ export function truncateAddress(address: string, length = 6): string {
  * createDeterministicCacheKey("search:", { label: "test", type: "Thing", creatorId: "0x123" })
  * createDeterministicCacheKey("search:", { type: "Thing", creatorId: "0x123", label: "test" })
  */
-export function createDeterministicCacheKey<T extends Record<string, any>>(
+export function createDeterministicCacheKey<T extends Record<string, unknown>>(
 	prefix: string,
 	obj: T
 ): string {
@@ -146,7 +146,8 @@ export function setImageSrc(
 		return;
 	}
 
-	img.src = url!;
+	// At this point, url is validated as a non-null string
+	img.src = url;
 	img.onerror = () => {
 		if (fallbackIcon) {
 			const span = document.createElement('span');

@@ -1,6 +1,7 @@
 /**
  * Debounced function interface with cancel capability
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface DebouncedFunction<T extends (...args: any[]) => any> {
 	(...args: Parameters<T>): void;
 	cancel(): void;
@@ -26,12 +27,14 @@ export interface DebouncedFunction<T extends (...args: any[]) => any> {
  * // Cancel pending execution
  * debouncedSearch.cancel();
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function debounce<T extends (...args: any[]) => any>(
 	func: T,
 	wait: number
 ): DebouncedFunction<T> {
 	let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const debouncedFn = function (this: any, ...args: Parameters<T>) {
 		// Clear existing timeout if there is one
 		if (timeoutId) {

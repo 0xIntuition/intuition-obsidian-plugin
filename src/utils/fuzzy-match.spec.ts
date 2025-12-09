@@ -38,7 +38,9 @@ describe('fuzzyMatch', () => {
 	it('should score fuzzy match below 0.7', () => {
 		const result = fuzzyMatch('btc', 'bitcoin');
 		expect(result).not.toBeNull();
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 		expect(result!.score).toBeLessThan(0.7);
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 		expect(result!.score).toBeGreaterThan(0);
 	});
 
@@ -50,24 +52,28 @@ describe('fuzzyMatch', () => {
 	it('should find character-by-character matches', () => {
 		const result = fuzzyMatch('btc', 'biTCoin');
 		expect(result).not.toBeNull();
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 		expect(result!.score).toBeGreaterThan(0);
 	});
 
 	it('should return match positions for exact match', () => {
 		const result = fuzzyMatch('test', 'test');
 		expect(result).not.toBeNull();
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 		expect(result!.matches).toEqual([{ start: 0, end: 4 }]);
 	});
 
 	it('should return match positions for starts-with', () => {
 		const result = fuzzyMatch('eth', 'Ethereum');
 		expect(result).not.toBeNull();
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 		expect(result!.matches).toEqual([{ start: 0, end: 3 }]);
 	});
 
 	it('should return match positions for contains', () => {
 		const result = fuzzyMatch('coin', 'Bitcoin');
 		expect(result).not.toBeNull();
+		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 		expect(result!.matches).toEqual([{ start: 3, end: 7 }]);
 	});
 

@@ -2,7 +2,7 @@
  * Tests for Claim Parser Service
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { ClaimParserService } from './claim-parser-service';
 import type IntuitionPlugin from '../main';
 
