@@ -213,3 +213,163 @@
 	font-weight: bold;
 	color: var(--text-accent);
 }
+
+/* ============================================================================
+   Claim Modal
+   ============================================================================ */
+
+/* Modal container */
+.intuition-claim-modal {
+	max-width: 600px;
+}
+
+/* Original text section */
+.claim-original-text {
+	background: var(--background-secondary);
+	padding: 12px;
+	border-radius: 4px;
+	border-left: 3px solid var(--text-accent);
+	margin-bottom: 20px;
+}
+
+.claim-original-text p {
+	margin: 0;
+	font-style: italic;
+}
+
+.claim-warning {
+	margin-top: 8px;
+	color: var(--text-warning);
+	font-size: 12px;
+}
+
+/* Triple inputs section */
+.claim-triple-inputs {
+	margin-bottom: 20px;
+}
+
+.claim-field {
+	margin-bottom: 16px;
+}
+
+.claim-field label {
+	display: block;
+	margin-bottom: 6px;
+	font-weight: 500;
+	font-size: 14px;
+}
+
+/* Claim status */
+.claim-status {
+	padding: 12px;
+	border-radius: 4px;
+	margin: 16px 0;
+	font-size: 14px;
+}
+
+.claim-status.draft {
+	background: var(--background-secondary);
+	color: var(--text-muted);
+}
+
+.claim-status.validating {
+	background: var(--background-secondary);
+	color: var(--text-normal);
+}
+
+.claim-status.exists {
+	background: rgba(0, 200, 100, 0.1);
+	border: 1px solid rgba(0, 200, 100, 0.3);
+	color: var(--text-success);
+}
+
+.claim-status.new {
+	background: rgba(100, 100, 255, 0.1);
+	border: 1px solid rgba(100, 100, 255, 0.3);
+	color: var(--text-accent);
+}
+
+.claim-status.invalid {
+	background: rgba(255, 100, 100, 0.1);
+	border: 1px solid rgba(255, 100, 100, 0.3);
+	color: var(--text-error);
+}
+
+/* Consensus section */
+.claim-consensus-section {
+	margin-top: 16px;
+}
+
+.consensus-notice {
+	padding: 12px;
+	margin-top: 12px;
+	background: var(--background-secondary);
+	border-radius: 4px;
+	font-size: 14px;
+}
+
+.consensus-header {
+	margin-top: 16px;
+	margin-bottom: 8px;
+}
+
+.consensus-header h4 {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.consensus-bar-container {
+	display: flex;
+	height: 24px;
+	border-radius: 4px;
+	overflow: hidden;
+	margin: 12px 0;
+}
+
+.consensus-bar {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 12px;
+	font-weight: 500;
+	color: white;
+	transition: width 0.3s ease;
+}
+
+.consensus-bar.for {
+	background: rgba(0, 200, 100, 0.8);
+}
+
+.consensus-bar.against {
+	background: rgba(255, 100, 100, 0.8);
+}
+
+.consensus-stats {
+	display: flex;
+	justify-content: space-between;
+	font-size: 12px;
+	color: var(--text-muted);
+	margin-top: 8px;
+}
+
+/* Validation errors */
+.claim-validation-errors {
+	margin-bottom: 12px;
+}
+
+.claim-validation-error {
+	color: var(--text-error);
+	font-size: 12px;
+	margin: 4px 0;
+}
+
+/* Actions */
+.claim-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 20px;
+	padding-top: 16px;
+	border-top: 1px solid var(--background-modifier-border);
+}

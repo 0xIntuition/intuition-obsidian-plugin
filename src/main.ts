@@ -1,7 +1,7 @@
 import { Plugin } from 'obsidian';
 import { IntuitionPluginSettings, DEFAULT_SETTINGS } from './types';
-import { NoticeManager, IntuitionSettingTab, WalletStatusBar } from './ui';
-import { SettingsService, WalletService, IntuitionService } from './services';
+import { NoticeManager, IntuitionSettingTab, WalletStatusBar, ClaimModal } from './ui';
+import { SettingsService, WalletService, IntuitionService, ClaimParserService } from './services';
 import { deepMergeSettings } from './utils';
 
 export default class IntuitionPlugin extends Plugin {
@@ -10,6 +10,7 @@ export default class IntuitionPlugin extends Plugin {
 	settingsService: SettingsService;
 	walletService: WalletService;
 	intuitionService: IntuitionService;
+	claimParserService: ClaimParserService;
 	statusBarEl: HTMLElement;
 	walletStatusBar: WalletStatusBar;
 
@@ -36,6 +37,10 @@ export default class IntuitionPlugin extends Plugin {
 		);
 		await this.intuitionService.initialize();
 
+		// Initialize Claim Parser service
+		this.claimParserService = new ClaimParserService(this);
+		await this.claimParserService.initialize();
+
 		// Add status bar
 		this.statusBarEl = this.addStatusBarItem();
 		this.walletStatusBar = new WalletStatusBar(this, this.statusBarEl);
@@ -49,19 +54,41 @@ export default class IntuitionPlugin extends Plugin {
 			this.noticeManager.info('Intuition plugin active');
 		});
 
-		// Register commands (placeholder)
+		// Register claim structuring command
 		this.addCommand({
-			id: 'publish-claim',
-			name: 'Publish claim to Intuition',
-			callback: () => {
-				this.noticeManager.info('Claim publishing coming soon');
-			}
+			id: 'structure-claim',
+			name: 'Structure claim for Intuition',
+			hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'i' }],
+			editorCallback: (editor, view) => {
+				const selection = editor.getSelection();
+				if (!selection || selection.trim().length === 0) {
+					this.noticeManager.warning('Please select text first');
+					return;
+				}
+
+				// Validate text is suitable for claim
+				const validation = this.claimParserService.validateClaim(selection);
+				if (!validation.isValid) {
+					this.noticeManager.error(`Invalid claim: ${validation.errors[0]}`);
+					return;
+				}
+
+				new ClaimModal(
+					this.app,
+					this,
+					selection,
+					view.file?.path || 'unknown'
+				).open();
+			},
 		});
 	}
 
 	onunload() {
 		if (this.walletStatusBar) {
 			this.walletStatusBar.unload();
+		}
+		if (this.claimParserService) {
+			this.claimParserService.cleanup();
 		}
 		if (this.intuitionService) {
 			this.intuitionService.cleanup();
