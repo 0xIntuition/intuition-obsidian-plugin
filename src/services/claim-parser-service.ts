@@ -79,6 +79,15 @@ export class ClaimParserService extends BaseService {
 	private convertLLMResult(
 		llmClaim: ExtractedClaimLLM
 	): TripleSuggestion {
+		// Validate that LLM returned non-empty components
+		if (
+			!llmClaim.subject.text?.trim() ||
+			!llmClaim.predicate.normalized?.trim() ||
+			!llmClaim.object.text?.trim()
+		) {
+			throw new Error('LLM returned empty or invalid components');
+		}
+
 		return {
 			subject: llmClaim.subject.text,
 			predicate: llmClaim.predicate.normalized,

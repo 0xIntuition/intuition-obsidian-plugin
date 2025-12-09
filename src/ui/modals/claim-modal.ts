@@ -98,7 +98,9 @@ export class ClaimModal extends Modal {
 		this.renderActions();
 
 		// Auto-extract triple from text (fire and forget - don't block modal)
-		void this.autoExtract();
+		this.autoExtract().catch(error => {
+			console.debug('Auto-extraction failed:', error);
+		});
 	}
 
 	onClose() {

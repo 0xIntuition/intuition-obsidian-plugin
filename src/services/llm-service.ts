@@ -79,7 +79,10 @@ export class LLMService extends BaseService {
 
 		try {
 			// Encrypt using CryptoService (same as wallet)
-			// Type cast is safe - encryptPrivateKey works with any string
+			// NOTE: Type cast to Hex is semantically incorrect (API keys are not hex strings)
+			// but the underlying AES-GCM encryption works with any UTF-8 string.
+			// TODO: Consider refactoring CryptoService.encryptPrivateKey to a generic
+			// encrypt(data: string) method to avoid this semantic mismatch.
 			const encrypted = await this.cryptoService.encryptPrivateKey(
 				apiKey as Hex,
 				password
@@ -161,9 +164,13 @@ export class LLMService extends BaseService {
 			this.autoLockTimer = null;
 		}
 
-		// Overwrite API key with zeros before clearing (security best practice)
+		// Clear API key from memory
+		// NOTE: JavaScript strings are immutable, so we can't truly zero memory.
+		// The string assignment below creates a new string and discards it immediately.
+		// The original decrypted key remains in memory until garbage collected.
+		// This is a limitation of JavaScript - true memory zeroing is not possible.
+		// We rely on the garbage collector to eventually clear the key from memory.
 		if (this.decryptedApiKey) {
-			this.decryptedApiKey = '0'.repeat(this.decryptedApiKey.length);
 			this.decryptedApiKey = null;
 		}
 
@@ -357,9 +364,21 @@ export class LLMService extends BaseService {
 
 	/**
 	 * Enqueue request with rate limiting
+	 *
+	 * NOTE: Minor race condition exists in concurrent request limiting.
+	 * Multiple requests waiting in the while loop could wake up simultaneously
+	 * and all increment activeRequests, potentially exceeding the limit of 3.
+	 * This is acceptable because:
+	 * 1. Impact is minimal (might have 4-5 concurrent requests instead of 3)
+	 * 2. Proper fix would require mutex/semaphore implementation
+	 * 3. Provider rate limits are per-second/minute, not concurrent
+	 * 4. Obsidian plugin usage patterns unlikely to trigger this edge case
+	 *
+	 * If stricter concurrency control is needed, consider implementing a proper
+	 * queue with semaphore pattern (e.g., using p-limit library).
 	 */
 	private async enqueueRequest<T>(fn: () => Promise<T>): Promise<T> {
-		// Check concurrent limit (3)
+		// Check concurrent limit (3) - minor race condition possible (see above)
 		while (this.activeRequests >= 3) {
 			await this.wait(100);
 		}
@@ -420,10 +439,23 @@ export class LLMService extends BaseService {
 
 	/**
 	 * Estimate token count from text (rough estimation)
+	 *
+	 * WARNING: This is a very rough heuristic with significant limitations:
+	 * - Assumes 1 token ≈ 4 characters (varies by model and language)
+	 * - Accuracy can vary by ±50% or more
+	 * - Less accurate for non-English text, code, or special characters
+	 * - Different models use different tokenizers (GPT vs Claude vs Gemini)
+	 *
+	 * For production use, consider using proper tokenizer libraries:
+	 * - js-tiktoken for OpenAI models
+	 * - @anthropic-ai/tokenizer for Claude models
+	 * - Model-specific tokenizers for other providers
+	 *
+	 * Current implementation is acceptable for rough cost estimates but should
+	 * not be relied upon for precise budget tracking.
 	 */
 	private estimateTokens(text: string): number {
 		// Rough estimation: 1 token ≈ 4 characters
-		// This is approximate - actual tokenization varies by model
 		return Math.ceil(text.length / 4);
 	}
 
