@@ -862,7 +862,405 @@ async activateView(viewType: string): Promise<void> {
 - [ ] Empty state when no positions
 - [ ] Prompt to connect wallet when locked
 
-## Testing
+## Testing Strategy
+
+### Test Files to Create
+
+```
+src/
+  types/
+    portfolio.spec.ts            # Portfolio type tests
+  services/
+    portfolio-service.spec.ts    # Position tracking tests
+  ui/
+    views/
+      portfolio-view.spec.ts     # Main view tests
+    components/
+      portfolio-summary.spec.ts  # Summary component tests
+      position-card.spec.ts      # Position card tests
+      position-filters.spec.ts   # Filter component tests
+
+tests/
+  integration/
+    portfolio-dashboard.integration.spec.ts  # End-to-end portfolio tests
+  fixtures/
+    portfolio.ts                 # Portfolio test fixtures
+    positions.ts                 # Position test data
+```
+
+### Unit Tests
+
+#### src/services/portfolio-service.spec.ts (~45 tests, 95% coverage)
+
+**Initialization (6 tests)**
+- Should initialize with null portfolio if wallet locked
+- Should refresh portfolio if wallet unlocked
+- Should start auto-refresh if wallet unlocked
+- Should listen for wallet unlock events
+- Should listen for wallet lock events
+- Should clear portfolio on wallet lock
+
+**Auto-Refresh (6 tests)**
+- Should start auto-refresh every 2 minutes
+- Should stop auto-refresh on stopAutoRefresh call
+- Should restart auto-refresh on wallet unlock
+- Should stop auto-refresh on wallet lock
+- Should handle multiple start calls gracefully
+- Should clear interval on cleanup
+
+**refresh() (10 tests)**
+- Should return null if wallet not unlocked
+- Should fetch positions from GraphQL
+- Should process each raw position
+- Should calculate total value correctly
+- Should calculate total cost correctly
+- Should calculate unrealized P&L correctly
+- Should calculate P&L percentage correctly
+- Should emit portfolio-updated event
+- Should update lastUpdated timestamp
+- Should handle API errors gracefully
+
+**fetchPositions() (6 tests)**
+- Should query positions for address
+- Should filter positions with shares > 0
+- Should order by shares descending
+- Should include vault and atom/triple data
+- Should lowercase address for query
+- Should handle empty results
+
+**processPosition() (10 tests)**
+- Should return null for positions without vault
+- Should calculate current value from shares and price
+- Should process triple positions correctly
+- Should process atom positions correctly
+- Should determine position side (for/against)
+- Should calculate consensus for triples
+- Should set type correctly
+- Should handle missing vault data
+- Should use default share price if missing
+- Should handle bigint calculations correctly
+
+**getStats() (5 tests)**
+- Should return null if no portfolio
+- Should count total positions
+- Should count profitable positions
+- Should count losing positions
+- Should find best and worst positions
+
+**cleanup() (2 tests)**
+- Should stop auto-refresh
+- Should handle multiple cleanup calls
+
+#### src/ui/views/portfolio-view.spec.ts (~40 tests, 90% coverage)
+
+**View Setup (5 tests)**
+- Should register correct view type
+- Should set correct display text
+- Should set correct icon
+- Should subscribe to portfolio updates
+- Should call render on open
+
+**No Wallet State (4 tests)**
+- Should show message if wallet not unlocked
+- Should show "Setup Wallet" button
+- Should open wallet setup on button click
+- Should style message correctly
+
+**Loading State (2 tests)**
+- Should show loading message if portfolio null
+- Should display loading indicator
+
+**Summary Section (8 tests)**
+- Should display total value in TRUST
+- Should format value to 4 decimal places
+- Should display P&L with sign
+- Should apply positive class for gains
+- Should apply negative class for losses
+- Should show stats (total, profitable, losing)
+- Should show last updated time
+- Should render refresh button
+
+**Controls Section (6 tests)**
+- Should render sort dropdown
+- Should render filter dropdown
+- Should have correct sort options
+- Should have correct filter options
+- Should update sortBy on change
+- Should update filterBy on change
+
+**Position Rendering (8 tests)**
+- Should render all positions after sort/filter
+- Should show empty message if no positions
+- Should render triple positions correctly
+- Should render atom positions correctly
+- Should display position side badge
+- Should display current value
+- Should display P&L percentage
+- Should display position details
+
+**Sorting (5 tests)**
+- Should sort by value descending
+- Should sort by value ascending
+- Should sort by P&L descending
+- Should sort by P&L ascending
+- Should maintain stable sort
+
+**Filtering (5 tests)**
+- Should show all positions by default
+- Should filter atoms only
+- Should filter triples only
+- Should filter profitable only
+- Should filter losing only
+
+**User Actions (4 tests)**
+- Should open explorer on "View" click
+- Should use correct network URL
+- Should trigger redeem on button click
+- Should handle refresh button click
+
+#### src/types/portfolio.spec.ts (~12 tests, 100% coverage)
+
+**Type Validations (6 tests)**
+- Should validate Portfolio structure
+- Should validate Position structure
+- Should validate PortfolioStats structure
+- Should handle optional fields
+- Should handle bigint fields
+- Should validate sort/filter enum values
+
+**Position Type (6 tests)**
+- Should accept 'atom' type
+- Should accept 'triple' type
+- Should accept valid side values
+- Should require numeric pnlPercent
+- Should require bigint shares
+- Should require timestamp fields
+
+#### src/ui/components/position-card.spec.ts (~15 tests, 90% coverage)
+
+**Rendering (8 tests)**
+- Should render card container
+- Should apply type-specific class
+- Should render header with title
+- Should render side badge for triples
+- Should render type badge for atoms
+- Should render value section
+- Should render details section
+- Should render action buttons
+
+**Triple Position Display (4 tests)**
+- Should format triple as "Subject → Predicate → Object"
+- Should show consensus percentage
+- Should color side badge correctly
+- Should handle long entity names
+
+**Atom Position Display (3 tests)**
+- Should display atom label
+- Should show atom type badge
+- Should handle missing image
+
+#### src/ui/components/portfolio-summary.spec.ts (~10 tests, 90% coverage)
+
+**Value Display (4 tests)**
+- Should format total value correctly
+- Should handle very large values
+- Should handle zero value
+- Should use TRUST suffix
+
+**P&L Display (4 tests)**
+- Should show positive P&L in green
+- Should show negative P&L in red
+- Should include + sign for positive
+- Should format percentage to 2 decimals
+
+**Stats Display (2 tests)**
+- Should show position counts
+- Should handle null stats
+
+### Integration Tests
+
+#### tests/integration/portfolio-dashboard.integration.spec.ts (~25 tests)
+
+**Portfolio Loading (6 tests)**
+- Should load portfolio on wallet unlock
+- Should display positions in view
+- Should calculate totals correctly
+- Should show correct P&L colors
+- Should handle empty portfolio
+- Should show loading state initially
+
+**Auto-Refresh (4 tests)**
+- Should refresh after 2 minutes
+- Should update displayed values
+- Should maintain sort/filter state
+- Should show updated timestamp
+
+**Sorting & Filtering (6 tests)**
+- Should apply sort to displayed positions
+- Should apply filter to displayed positions
+- Should combine sort and filter
+- Should persist selection across refreshes
+- Should handle empty results
+- Should update UI immediately
+
+**User Actions (5 tests)**
+- Should open explorer with correct URL
+- Should trigger redeem flow
+- Should handle manual refresh
+- Should handle wallet disconnect
+- Should restore state on reconnect
+
+**Error Handling (4 tests)**
+- Should handle network errors gracefully
+- Should show error message
+- Should allow retry
+- Should maintain previous data on error
+
+### Test Fixtures
+
+```typescript
+// tests/fixtures/portfolio.ts
+export const mockPortfolio: Portfolio = {
+  address: '0x1234567890abcdef1234567890abcdef12345678',
+  totalValue: BigInt(150e18),
+  totalCost: BigInt(100e18),
+  unrealizedPnL: BigInt(50e18),
+  pnlPercent: 50.0,
+  positions: [mockTriplePosition, mockAtomPosition],
+  lastUpdated: Date.now(),
+};
+
+export const mockEmptyPortfolio: Portfolio = {
+  address: '0x1234567890abcdef1234567890abcdef12345678',
+  totalValue: BigInt(0),
+  totalCost: BigInt(0),
+  unrealizedPnL: BigInt(0),
+  pnlPercent: 0,
+  positions: [],
+  lastUpdated: Date.now(),
+};
+
+export const mockPortfolioStats: PortfolioStats = {
+  totalPositions: 5,
+  profitablePositions: 3,
+  losingPositions: 2,
+  bestPosition: mockTriplePosition,
+  worstPosition: mockLosingPosition,
+};
+
+// tests/fixtures/positions.ts
+export const mockTriplePosition: Position = {
+  id: 'pos-1',
+  type: 'triple',
+  triple: {
+    id: 'triple-1',
+    tripleId: '123',
+    subject: { id: '1', termId: '1', label: 'Ethereum' },
+    predicate: { id: '2', termId: '2', label: 'is' },
+    object: { id: '3', termId: '3', label: 'decentralized' },
+  },
+  vaultId: 'vault-1',
+  side: 'for',
+  shares: BigInt(10e18),
+  currentValue: BigInt(12e18),
+  costBasis: BigInt(10e18),
+  unrealizedPnL: BigInt(2e18),
+  pnlPercent: 20.0,
+  consensus: 75.5,
+  stakerCount: 50,
+  sharePrice: BigInt(1.2e18),
+  entryTimestamp: Date.now() - 86400000,
+  lastActivityTimestamp: Date.now(),
+};
+
+export const mockAtomPosition: Position = {
+  id: 'pos-2',
+  type: 'atom',
+  atom: {
+    id: '4',
+    termId: 'atom-4',
+    label: 'Bitcoin',
+    type: 'entity',
+    image: 'https://example.com/btc.png',
+  },
+  vaultId: 'vault-2',
+  side: 'neutral',
+  shares: BigInt(5e18),
+  currentValue: BigInt(6e18),
+  costBasis: BigInt(5e18),
+  unrealizedPnL: BigInt(1e18),
+  pnlPercent: 20.0,
+  consensus: 0,
+  stakerCount: 30,
+  sharePrice: BigInt(1.2e18),
+  entryTimestamp: Date.now() - 172800000,
+  lastActivityTimestamp: Date.now(),
+};
+
+export const mockLosingPosition: Position = {
+  ...mockTriplePosition,
+  id: 'pos-3',
+  currentValue: BigInt(8e18),
+  unrealizedPnL: BigInt(-2e18),
+  pnlPercent: -20.0,
+};
+```
+
+### Mock Requirements
+
+```typescript
+// Portfolio service mock
+export const createMockPortfolioService = () => ({
+  initialize: vi.fn(),
+  refresh: vi.fn().mockResolvedValue(mockPortfolio),
+  getPortfolio: vi.fn().mockReturnValue(mockPortfolio),
+  getStats: vi.fn().mockReturnValue(mockPortfolioStats),
+  cleanup: vi.fn(),
+  on: vi.fn(),
+  off: vi.fn(),
+  trigger: vi.fn(),
+});
+
+// GraphQL response mock for positions
+export const mockPositionsResponse = {
+  positions: [
+    {
+      id: 'pos-1',
+      account_id: '0x123...',
+      vault_id: 'vault-1',
+      shares: '10000000000000000000',
+      vault: {
+        id: 'vault-1',
+        current_share_price: '1200000000000000000',
+        position_count: 50,
+        triple: {
+          id: 'triple-1',
+          subject: { id: '1', term_id: '1', label: 'Ethereum' },
+          predicate: { id: '2', term_id: '2', label: 'is' },
+          object: { id: '3', term_id: '3', label: 'decentralized' },
+          vault: { position_count: 40, current_share_price: '1200000000000000000' },
+          counter_vault: { position_count: 10, current_share_price: '1000000000000000000' },
+        },
+      },
+    },
+  ],
+};
+```
+
+### Coverage Targets
+
+| File | Target | Notes |
+|------|--------|-------|
+| portfolio-service.ts | 95% | Data aggregation, critical |
+| portfolio-view.ts | 90% | Main view component |
+| position-card.ts | 90% | Position display |
+| portfolio-summary.ts | 90% | Summary component |
+| position-filters.ts | 90% | Filter controls |
+| types/portfolio.ts | 100% | Type definitions |
+
+**Overall Plan 012 Target: 92%+ coverage, ~122 tests**
+
+### Manual Testing Checklist
 1. Open portfolio view without wallet - verify prompt
 2. Connect wallet - verify positions load
 3. Sort by value - verify ordering

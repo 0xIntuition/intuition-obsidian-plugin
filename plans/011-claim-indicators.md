@@ -626,7 +626,391 @@ export function createClaimIndicatorPlugin(plugin: IntuitionPlugin) {
 - [ ] Performance acceptable for long docs
 - [ ] Feature toggleable in settings
 
-## Testing
+## Testing Strategy
+
+### Test Files to Create
+
+```
+src/
+  types/
+    claim-indicators.spec.ts     # Indicator type tests
+  services/
+    claim-extraction.spec.ts     # Sentence extraction tests
+    claim-matching.spec.ts       # Triple matching tests
+  ui/
+    extensions/
+      claim-indicator.spec.ts    # CodeMirror extension tests
+    components/
+      claim-tooltip.spec.ts      # Tooltip tests
+
+tests/
+  integration/
+    claim-indicators.integration.spec.ts  # End-to-end indicator tests
+  fixtures/
+    claims.ts                    # Claim test fixtures
+    sentences.ts                 # Sentence test data
+```
+
+### Unit Tests
+
+#### src/services/claim-extraction.spec.ts (~50 tests, 95% coverage)
+
+**Sentence Splitting (10 tests)**
+- Should split content by periods
+- Should split content by exclamation marks
+- Should split content by question marks
+- Should handle newlines as delimiters
+- Should filter sentences < 10 characters
+- Should filter sentences > 300 characters
+- Should capture correct positions
+- Should handle consecutive punctuation
+- Should handle abbreviations (e.g., "Dr.", "U.S.")
+- Should handle decimal numbers in sentences
+
+**Hedge Pattern Detection (8 tests)**
+- Should detect "might" as hedged
+- Should detect "could" as hedged
+- Should detect "may" as hedged
+- Should detect "possibly" as hedged
+- Should detect "perhaps" as hedged
+- Should detect "seems" as hedged
+- Should be case-insensitive
+- Should not match within words (e.g., "nightmare")
+
+**First-Person Detection (6 tests)**
+- Should detect "I think" as first-person
+- Should detect "I believe" as first-person
+- Should detect "We think" as first-person
+- Should only match at sentence start
+- Should be case-insensitive
+- Should not match mid-sentence
+
+**Assertion Verb Detection (8 tests)**
+- Should detect "is/are" verbs
+- Should detect "has/have" verbs
+- Should detect "does/do" verbs
+- Should detect "uses" verb
+- Should detect "creates" verb
+- Should detect "provides" verb
+- Should be case-insensitive
+- Should handle verb conjugations
+
+**Confidence Calculation (8 tests)**
+- Should add 0.3 for assertion verb
+- Should add 0.2 for non-question
+- Should add 0.2 for non-hedged
+- Should add 0.2 for non-first-person
+- Should add 0.1 for named entity
+- Should return null if confidence < 0.4
+- Should calculate combined confidence correctly
+- Should cap at 1.0 maximum
+
+**Component Extraction (10 tests)**
+- Should extract "X is Y" pattern
+- Should extract "X uses Y" pattern
+- Should extract "X has Y" pattern
+- Should extract "X created by Y" passive pattern
+- Should handle "is a" construction
+- Should handle complex subjects
+- Should handle complex objects
+- Should return nulls if no pattern matches
+- Should trim extracted components
+- Should handle multiple pattern matches (use first)
+
+**Mock Requirements:**
+```typescript
+// tests/fixtures/sentences.ts
+export const testSentences = {
+  assertion: 'Ethereum uses proof-of-stake.',
+  hedged: 'Bitcoin might become more scalable.',
+  firstPerson: 'I think blockchain is revolutionary.',
+  question: 'What is decentralization?',
+  tooShort: 'Hi there.',
+  tooLong: 'A'.repeat(350),
+  validClaim: 'Solana is a fast blockchain platform.',
+  passive: 'Bitcoin was created by Satoshi Nakamoto.',
+};
+
+export const expectedExtraction = {
+  validClaim: {
+    suggestedSubject: 'Solana',
+    suggestedPredicate: 'is',
+    suggestedObject: 'a fast blockchain platform',
+    confidence: 0.9,
+    isHedged: false,
+    isFirstPerson: false,
+    isQuestion: false,
+  },
+};
+```
+
+#### src/services/claim-matching.spec.ts (~40 tests, 90% coverage)
+
+**matchClaims() (5 tests)**
+- Should process array of claims
+- Should return ClaimIndicator for each claim
+- Should maintain claim order
+- Should handle empty array
+- Should handle concurrent matching
+
+**matchSingleClaim() - Exclusions (6 tests)**
+- Should return excluded status for questions
+- Should return excluded status for hedged claims
+- Should return excluded status for first-person claims
+- Should return not-found for missing subject
+- Should return not-found for missing predicate
+- Should return not-found for missing object
+
+**matchSingleClaim() - Atom Search (10 tests)**
+- Should search for subject atoms
+- Should search for predicate atoms
+- Should search for object atoms
+- Should limit search to 5 results per term
+- Should handle search errors gracefully
+- Should try multiple atom combinations
+- Should find exact label matches
+- Should handle partial matches
+- Should return not-found if no atoms found
+- Should handle concurrent searches
+
+**matchSingleClaim() - Triple Lookup (8 tests)**
+- Should find triple with matching atoms
+- Should try all atom combinations
+- Should calculate consensus for found triple
+- Should determine status from consensus
+- Should calculate match confidence
+- Should return first matching triple
+- Should handle triple lookup errors
+- Should return not-found if no triple matches
+
+**getStatusFromConsensus() (6 tests)**
+- Should return unstaked for < $10 equivalent stake
+- Should return verified for >= 75% consensus
+- Should return contested for 40-75% consensus
+- Should return disputed for < 40% consensus
+- Should handle edge case values
+- Should use bigint comparison correctly
+
+**calculateMatchConfidence() (5 tests)**
+- Should add 0.33 for subject match
+- Should add 0.34 for predicate match
+- Should add 0.33 for object match
+- Should handle case-insensitive comparison
+- Should handle partial matches
+
+#### src/ui/extensions/claim-indicator.spec.ts (~35 tests, 85% coverage)
+
+**ClaimIndicatorWidget - Rendering (10 tests)**
+- Should create span element
+- Should not render for excluded claims
+- Should show ✓ for verified status
+- Should show ⚠ for contested status
+- Should show ✗ for disputed status
+- Should show ○ for unstaked status
+- Should show · for not-found status
+- Should show ◐ for checking status
+- Should apply correct color per status
+- Should set appropriate tooltip text
+
+**ClaimIndicatorWidget - Click Handler (5 tests)**
+- Should handle click for not-found (open publisher)
+- Should handle click for found (show details)
+- Should prevent event propagation
+- Should prevent default behavior
+- Should access claim data correctly
+
+**ClaimIndicatorWidget - Equality (4 tests)**
+- Should return true for same claim and status
+- Should return false for different claim ID
+- Should return false for different status
+- Should handle null comparisons
+
+**ViewPlugin - Initialization (4 tests)**
+- Should start with empty decorations
+- Should check enableClaimIndicators setting
+- Should initialize extraction service
+- Should initialize matching service
+
+**ViewPlugin - Updates (8 tests)**
+- Should update on document change
+- Should update on viewport change
+- Should skip if feature disabled
+- Should extract claims from visible viewport
+- Should adjust positions for viewport offset
+- Should match claims asynchronously
+- Should build decorations from indicators
+- Should skip excluded indicators in decorations
+
+**ViewPlugin - Performance (4 tests)**
+- Should prevent concurrent updates
+- Should handle rapid document changes
+- Should limit viewport extraction
+- Should sort decorations by position
+
+#### src/types/claim-indicators.spec.ts (~15 tests, 100% coverage)
+
+**getStatusIcon() (7 tests)**
+- Should return ✓ for verified
+- Should return ⚠ for contested
+- Should return ✗ for disputed
+- Should return ○ for unstaked
+- Should return · for not-found
+- Should return empty for excluded
+- Should return ◐ for checking
+
+**getStatusColor() (7 tests)**
+- Should return green for verified
+- Should return yellow for contested
+- Should return red for disputed
+- Should return gray for unstaked
+- Should return darker gray for not-found
+- Should return transparent for excluded
+- Should return gray for checking
+
+**Type Validations (1 test)**
+- Should validate ExtractedClaim structure
+
+### Integration Tests
+
+#### tests/integration/claim-indicators.integration.spec.ts (~25 tests)
+
+**Extraction to Display Flow (8 tests)**
+- Should extract claims from note content
+- Should display indicator after sentence
+- Should match claim against knowledge graph
+- Should show correct status indicator
+- Should update on content change
+- Should handle multiple claims
+- Should cache matching results
+- Should handle new claims added
+
+**Status Display (6 tests)**
+- Should show verified for high consensus claims
+- Should show contested for mixed consensus claims
+- Should show disputed for low consensus claims
+- Should show not-found for missing claims
+- Should handle claims with no stake
+- Should update status on data refresh
+
+**User Interactions (5 tests)**
+- Should open publisher for not-found claims
+- Should show details for found claims
+- Should toggle via settings
+- Should respect feature toggle
+- Should integrate with claim modal
+
+**Exclusion Logic (6 tests)**
+- Should not show indicator for questions
+- Should not show indicator for hedged statements
+- Should not show indicator for first-person statements
+- Should not show indicator for short sentences
+- Should handle mixed content correctly
+- Should skip code blocks and frontmatter
+
+### Test Fixtures
+
+```typescript
+// tests/fixtures/claims.ts
+export const mockExtractedClaim: ExtractedClaim = {
+  id: 'claim-1',
+  text: 'Ethereum uses proof-of-stake.',
+  position: { from: 0, to: 31 },
+  suggestedSubject: 'Ethereum',
+  suggestedPredicate: 'uses',
+  suggestedObject: 'proof-of-stake',
+  confidence: 0.9,
+  isHedged: false,
+  isFirstPerson: false,
+  isQuestion: false,
+};
+
+export const mockClaimIndicator: ClaimIndicator = {
+  claim: mockExtractedClaim,
+  status: 'verified',
+  matchedTriple: {
+    id: 'triple-1',
+    tripleId: '123',
+    subject: { id: '1', termId: '1', label: 'Ethereum' },
+    predicate: { id: '2', termId: '2', label: 'uses' },
+    object: { id: '3', termId: '3', label: 'proof-of-stake' },
+    forVault: {
+      id: 'vault-1',
+      totalAssets: BigInt(100e18),
+      totalShares: BigInt(100e18),
+      currentSharePrice: BigInt(1e18),
+      positionCount: 80,
+    },
+    againstVault: {
+      id: 'vault-2',
+      totalAssets: BigInt(20e18),
+      totalShares: BigInt(20e18),
+      currentSharePrice: BigInt(1e18),
+      positionCount: 10,
+    },
+  },
+  consensus: {
+    forPercentage: 83.3,
+    againstPercentage: 16.7,
+    totalStaked: BigInt(120e18),
+    forStaked: BigInt(100e18),
+    againstStaked: BigInt(20e18),
+  },
+  matchConfidence: 0.95,
+};
+
+export const mockExcludedClaim: ExtractedClaim = {
+  ...mockExtractedClaim,
+  id: 'claim-2',
+  text: 'I think Ethereum is good.',
+  isFirstPerson: true,
+  confidence: 0.3,
+};
+
+export const mockNotFoundClaim: ClaimIndicator = {
+  claim: {
+    ...mockExtractedClaim,
+    id: 'claim-3',
+    text: 'FooBar uses BazQux.',
+    suggestedSubject: 'FooBar',
+    suggestedObject: 'BazQux',
+  },
+  status: 'not-found',
+  matchedTriple: null,
+  consensus: null,
+  matchConfidence: 0,
+};
+```
+
+### Mock Requirements
+
+```typescript
+// Claim extraction service mock
+export const createMockExtractionService = () => ({
+  extractClaims: vi.fn().mockReturnValue([mockExtractedClaim]),
+  splitIntoSentences: vi.fn(),
+  analyzeSentence: vi.fn(),
+});
+
+// Claim matching service mock
+export const createMockMatchingService = () => ({
+  matchClaims: vi.fn().mockResolvedValue([mockClaimIndicator]),
+  matchSingleClaim: vi.fn(),
+});
+```
+
+### Coverage Targets
+
+| File | Target | Notes |
+|------|--------|-------|
+| claim-extraction.ts | 95% | Regex/NLP logic, highly testable |
+| claim-matching.ts | 90% | Async matching logic |
+| claim-indicator.ts | 85% | CodeMirror extension |
+| types/claim-indicators.ts | 100% | Pure functions |
+| claim-tooltip.ts | 90% | UI component |
+
+**Overall Plan 011 Target: 90%+ coverage, ~140 tests**
+
+### Manual Testing Checklist
 1. Write sentence "Ethereum uses proof-of-stake" - verify indicator
 2. Write "I think Ethereum is good" - verify excluded
 3. Write "Ethereum might be scalable" - verify excluded

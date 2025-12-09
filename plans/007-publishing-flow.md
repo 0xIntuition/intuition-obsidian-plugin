@@ -833,7 +833,260 @@ export class StakeModal extends Modal {
 - [ ] Failures show clear error
 - [ ] Note annotation works (if enabled)
 
-## Testing
+## Testing Strategy
+
+### Test Files to Create
+
+```
+src/
+  types/
+    transactions.spec.ts        # Type validation tests
+    staking.spec.ts             # Staking type tests
+  services/
+    transaction-service.spec.ts # Transaction building tests
+    impact-calculator.spec.ts   # Impact calculation tests
+  ui/
+    modals/
+      stake-modal.spec.ts       # Modal behavior tests
+
+tests/
+  integration/
+    publishing-flow.integration.spec.ts  # End-to-end publishing tests
+  fixtures/
+    transactions.ts             # Transaction test data
+    staking.ts                  # Staking test fixtures
+```
+
+### Unit Tests
+
+#### src/services/impact-calculator.spec.ts (~25 tests, 95% coverage)
+
+**Constructor & Setup (3 tests)**
+- Should initialize with publicClient and multiVaultAddress
+- Should handle missing parameters gracefully
+- Should validate multiVault address format
+
+**calculateImpact() - Consensus Calculations (8 tests)**
+- Should calculate correct current consensus from vault data
+- Should calculate new consensus after stake (for position)
+- Should calculate new consensus after stake (against position)
+- Should handle empty vaults (50% default consensus)
+- Should calculate consensus change correctly (positive)
+- Should calculate consensus change correctly (negative)
+- Should handle zero total assets gracefully
+- Should cap consensus at 100% maximum
+
+**calculateImpact() - Share Calculations (6 tests)**
+- Should call previewDeposit with correct parameters
+- Should calculate ownership percentage correctly
+- Should handle first staker scenario (100% ownership)
+- Should calculate estimated exit value correctly
+- Should handle zero shares gracefully
+- Should handle large stake amounts without overflow
+
+**calculateImpact() - Edge Cases (4 tests)**
+- Should handle bigint overflow scenarios
+- Should return correct defaults for new claims
+- Should handle network errors gracefully
+- Should cache results for repeated calculations
+
+**Mock Requirements:**
+```typescript
+// tests/fixtures/staking.ts
+export const mockForVault: VaultData = {
+  id: 'vault-1',
+  totalAssets: BigInt(100e18),
+  totalShares: BigInt(100e18),
+  currentSharePrice: BigInt(1e18),
+  positionCount: 10,
+};
+
+export const mockAgainstVault: VaultData = {
+  id: 'vault-2',
+  totalAssets: BigInt(50e18),
+  totalShares: BigInt(50e18),
+  currentSharePrice: BigInt(1e18),
+  positionCount: 5,
+};
+```
+
+#### src/services/transaction-service.spec.ts (~40 tests, 90% coverage)
+
+**buildTransactionPlan() - Step Generation (12 tests)**
+- Should create atom step for new subject
+- Should create atom step for new predicate
+- Should create atom step for new object
+- Should create triple step for new claim
+- Should create deposit step with correct position
+- Should skip atom creation for existing atoms
+- Should skip triple creation for existing triple
+- Should calculate correct total cost with fees
+- Should estimate gas correctly
+- Should handle all-new claim (3 atoms + 1 triple + 1 deposit)
+- Should handle all-existing claim (1 deposit only)
+- Should generate unique step IDs
+
+**buildTransactionPlan() - Cost Calculations (6 tests)**
+- Should include stake amount in total cost
+- Should add 0.0003 ETH per atom creation
+- Should add 0.0004 ETH for triple creation
+- Should calculate gas estimate based on step count
+- Should handle very large stake amounts
+- Should handle minimum stake amounts
+
+**executeTransactionPlan() - Success Flow (10 tests)**
+- Should execute steps in correct order
+- Should update step status to 'signing'
+- Should update step status to 'confirming'
+- Should update step status to 'confirmed'
+- Should call onStepUpdate callback for each status change
+- Should return success result with tripleId
+- Should return all transaction hashes
+- Should return created atom IDs
+- Should handle existing atoms correctly
+- Should handle existing triple correctly
+
+**executeTransactionPlan() - Error Handling (8 tests)**
+- Should mark failed step correctly
+- Should stop execution on first failure
+- Should return partial results on failure
+- Should include error message in result
+- Should handle user rejection gracefully
+- Should handle network errors
+- Should handle insufficient funds
+- Should handle gas estimation failures
+
+**Contract Interactions (4 tests)**
+- Should encode createAtom correctly
+- Should encode createTriple correctly
+- Should encode depositTriple correctly
+- Should use correct contract addresses per network
+
+#### src/ui/modals/stake-modal.spec.ts (~30 tests, 85% coverage)
+
+**Modal Lifecycle (5 tests)**
+- Should render all sections on open
+- Should clean up on close
+- Should initialize with default stake amount from settings
+- Should initialize with 'for' position by default
+- Should show claim summary correctly
+
+**Stake Input (6 tests)**
+- Should update stake amount on input change
+- Should trigger impact recalculation on amount change
+- Should show wallet balance
+- Should validate numeric input
+- Should handle decimal amounts
+- Should prevent negative amounts
+
+**Position Selection (4 tests)**
+- Should toggle between for/against
+- Should trigger impact recalculation on position change
+- Should display correct labels
+- Should update UI on position change
+
+**Impact Preview (6 tests)**
+- Should display consensus change
+- Should display share amount
+- Should display ownership percentage
+- Should display estimated exit value
+- Should handle null impact gracefully
+- Should format large numbers correctly
+
+**Transaction Plan Display (4 tests)**
+- Should display all transaction steps
+- Should display total cost
+- Should update on plan changes
+- Should show step descriptions
+
+**Execute Stake (5 tests)**
+- Should validate stake amount before execution
+- Should check wallet is unlocked
+- Should check sufficient balance
+- Should show progress during execution
+- Should handle success/error states
+
+### Integration Tests
+
+#### tests/integration/publishing-flow.integration.spec.ts (~20 tests)
+
+**End-to-End Publishing Flow (8 tests)**
+- Should publish new claim with all new atoms
+- Should publish claim with existing subject atom
+- Should publish claim with existing triple (deposit only)
+- Should handle stake for position correctly
+- Should handle stake against position correctly
+- Should update note annotation on success
+- Should show success notification
+- Should refresh wallet balance after publish
+
+**Error Scenarios (6 tests)**
+- Should handle wallet locked error
+- Should handle insufficient balance error
+- Should handle network disconnection
+- Should handle transaction rejection by user
+- Should handle contract revert
+- Should recover gracefully from partial failure
+
+**UI Integration (6 tests)**
+- Should open stake modal from claim modal
+- Should pass draft data correctly between modals
+- Should close modals on successful publish
+- Should display transaction progress
+- Should enable/disable buttons appropriately
+- Should persist settings between sessions
+
+### Test Fixtures
+
+```typescript
+// tests/fixtures/transactions.ts
+export const mockTransactionPlan: TransactionPlan = {
+  steps: [
+    {
+      id: 'step-1',
+      type: 'createAtom',
+      description: 'Create atom: Ethereum',
+      status: 'pending',
+    },
+    {
+      id: 'step-2',
+      type: 'createTriple',
+      description: 'Create triple claim',
+      status: 'pending',
+    },
+    {
+      id: 'step-3',
+      type: 'depositTriple',
+      description: 'Stake 0.01 TRUST (for)',
+      status: 'pending',
+    },
+  ],
+  totalCost: BigInt(0.01e18 + 0.0003e18 + 0.0004e18),
+  estimatedGas: BigInt(600000),
+};
+
+export const mockPublishResult: PublishResult = {
+  success: true,
+  tripleId: '0x123...' as Hex,
+  atomsCreated: ['0xabc...'] as Hex[],
+  transactionHashes: ['0xdef...', '0xghi...'] as Hex[],
+  sharesReceived: BigInt(1e18),
+};
+```
+
+### Coverage Targets
+
+| File | Target | Notes |
+|------|--------|-------|
+| impact-calculator.ts | 95% | Pure calculations, highly testable |
+| transaction-service.ts | 90% | Complex but critical |
+| stake-modal.ts | 85% | UI interactions |
+| types/transactions.ts | 100% | Type definitions |
+| types/staking.ts | 100% | Type definitions |
+
+**Overall Plan 007 Target: 90%+ coverage, ~95 tests**
+
+### Manual Testing Checklist
 1. Open stake modal from claim modal
 2. Enter stake amount - verify impact updates
 3. Toggle position - verify impact changes
