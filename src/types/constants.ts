@@ -84,3 +84,44 @@ export const WALLET_ERRORS = {
 		'Failed to decrypt wallet. Your password may be incorrect.',
 	ALREADY_EXISTS: 'Wallet already exists. Delete existing wallet first.',
 } as const;
+
+// LLM Error Messages
+export const LLM_ERRORS = {
+	NO_API_KEY: 'No API key configured. Please setup LLM provider first.',
+	API_KEY_LOCKED: 'API key is locked. Please unlock to use LLM features.',
+	INVALID_PROVIDER: 'Invalid LLM provider selected.',
+	INVALID_MODEL: 'Invalid model selected for provider.',
+	RATE_LIMIT_EXCEEDED: 'Rate limit exceeded. Please wait before retrying.',
+	BUDGET_EXCEEDED: 'Monthly budget limit reached. Increase budget or wait for reset.',
+	CONNECTION_FAILED: 'Failed to connect to LLM provider. Please check your API key.',
+	SUSPICIOUS_INPUT: 'Suspicious input detected. Please revise your request.',
+	ENCRYPTION_FAILED: 'Failed to encrypt API key. Please try again.',
+	DECRYPTION_FAILED: 'Failed to decrypt API key. Your password may be incorrect.',
+	CUSTOM_ENDPOINT_INVALID: 'Custom endpoint must use HTTPS protocol.',
+	CUSTOM_ENDPOINT_INTERNAL: 'Cannot use internal IP addresses for custom endpoint.',
+} as const;
+
+// LLM Setting Names
+export const LLM_SETTING_NAMES = {
+	ENABLED: 'Enable AI Features',
+	PROVIDER: 'LLM Provider',
+	MODEL: 'Model',
+	API_KEY: 'API Key',
+	CUSTOM_ENDPOINT: 'Custom Endpoint',
+	COST_TRACKING: 'Track Usage & Costs',
+	BUDGET: 'Monthly Budget (USD)',
+	WARNING_THRESHOLD: 'Budget Warning Threshold',
+	REQUIRE_CONFIRMATION: 'Require Confirmation for Requests',
+	USAGE_STATS: 'Usage Statistics',
+	RESET_STATS: 'Reset Statistics',
+	FEATURE_CLAIM_EXTRACTION: 'Claim Extraction',
+	FEATURE_ENTITY_DISAMBIGUATION: 'Entity Disambiguation',
+	FEATURE_PREDICATE_SUGGESTION: 'Predicate Suggestion',
+	FEATURE_BATCH_ANALYSIS: 'Batch Note Analysis',
+	FEATURE_KNOWLEDGE_QA: 'Knowledge Q&A',
+	FEATURE_CLAIM_IMPROVEMENT: 'Claim Improvement',
+	FEATURE_AUTO_TAGGING: 'Auto-Tagging',
+	FEATURE_RELATIONSHIP_DISCOVERY: 'Relationship Discovery',
+	FEATURE_SUMMARY_GENERATION: 'Summary Generation',
+	FEATURE_FACT_CHECKING: 'Fact Checking',
+} as const;

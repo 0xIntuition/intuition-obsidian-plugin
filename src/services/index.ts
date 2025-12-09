@@ -4,5 +4,6 @@ export * from './claim-parser-service';
 export * from './crypto-service';
 export * from './graphql-client';
 export * from './intuition-service';
+export * from './llm-service';
 export * from './settings-service';
 export * from './wallet-service';
