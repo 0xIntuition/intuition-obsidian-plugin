@@ -17,10 +17,10 @@ import {
 	type ValidationResult,
 	type LLMCostEstimate,
 } from '../types';
-// AI SDK imports - will be available after Phase 7
-// import { createAnthropic } from '@ai-sdk/anthropic';
-// import { createOpenAI } from '@ai-sdk/openai';
-// import { createGoogleGenerativeAI } from '@ai-sdk/google';
+// AI SDK imports
+import { createAnthropic } from '@ai-sdk/anthropic';
+import { createOpenAI } from '@ai-sdk/openai';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 
 export class LLMService extends BaseService {
 	private cryptoService: CryptoService;
@@ -29,10 +29,10 @@ export class LLMService extends BaseService {
 	private llmClient: any = null; // Vercel AI SDK client
 	private autoLockTimer: NodeJS.Timeout | null = null;
 
-	// TODO: Phase 4 - Add rate limiting state back
-	// private activeRequests = 0;
-	// private lastRequestTime = 0;
-	// private requestTimestamps: number[] = [];
+	// Rate limiting state
+	private activeRequests = 0;
+	private lastRequestTime = 0;
+	private requestTimestamps: number[] = [];
 
 	constructor(plugin: IntuitionPlugin) {
 		super(plugin);
@@ -223,8 +223,7 @@ export class LLMService extends BaseService {
 			}
 		}
 
-		// TODO: Uncomment after Phase 7 (AI SDK installation)
-		/*
+
 		try {
 			switch (provider) {
 				case 'anthropic':
@@ -264,10 +263,7 @@ export class LLMService extends BaseService {
 				error
 			);
 		}
-		*/
 
-		// Temporary: Set client to a placeholder
-		this.llmClient = { provider }; // Will be replaced in Phase 7
 	}
 
 	/**
@@ -324,8 +320,9 @@ export class LLMService extends BaseService {
 		}
 	}
 
-	// TODO: Phase 4 - Add these methods back when implementing extractClaims
-	/*
+	/**
+	 * Sanitize user input to prevent prompt injection
+	 */
 	private sanitizeInput(text: string): string {
 		// Remove null bytes
 		let sanitized = text.replace(/\0/g, '');
@@ -339,6 +336,9 @@ export class LLMService extends BaseService {
 		return sanitized.trim();
 	}
 
+	/**
+	 * Detect suspicious patterns that might be prompt injection attempts
+	 */
 	private detectSuspiciousPatterns(text: string): boolean {
 		const patterns = [
 			/ignore\s+previous\s+instructions/i,
@@ -355,6 +355,9 @@ export class LLMService extends BaseService {
 		return patterns.some((pattern) => pattern.test(text));
 	}
 
+	/**
+	 * Enqueue request with rate limiting
+	 */
 	private async enqueueRequest<T>(fn: () => Promise<T>): Promise<T> {
 		// Check concurrent limit (3)
 		while (this.activeRequests >= 3) {
@@ -391,14 +394,13 @@ export class LLMService extends BaseService {
 			this.resetAutoLockTimer();
 		}
 	}
-	*/
 
-	// TODO: Phase 4 - Add wait utility back
-	/*
+	/**
+	 * Wait utility for rate limiting
+	 */
 	private wait(ms: number): Promise<void> {
 		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
-	*/
 
 	/**
 	 * Reset auto-lock timer (30 minutes)
@@ -571,6 +573,146 @@ export class LLMService extends BaseService {
 		};
 		await this.plugin.saveSettings();
 		this.plugin.noticeManager.info('Monthly usage stats reset');
+	}
+
+	/**
+	 * Extract claims from text using LLM
+	 * Returns array of extracted claims (empty on failure)
+	 */
+	async extractClaims(
+		text: string,
+		context?: string
+	): Promise<import('../types/llm').ExtractedClaimLLM[]> {
+		if (!this.isAvailable()) {
+			throw new PluginError(
+				LLM_ERRORS.NO_API_KEY,
+				ErrorCode.LLM_API_KEY_LOCKED,
+				true
+			);
+		}
+
+		// Sanitize input (prevents prompt injection)
+		const sanitized = this.sanitizeInput(text);
+
+		// Check for suspicious patterns
+		if (this.detectSuspiciousPatterns(sanitized)) {
+			console.warn(
+				'Suspicious input detected, skipping LLM extraction'
+			);
+			return [];
+		}
+
+		// Estimate cost
+		const expectedOutputTokens = 400;
+		const estimate = this.estimateCost(sanitized, expectedOutputTokens);
+
+		// Check budget
+		const budgetCheck = this.checkBudget(estimate.estimatedCostUSD);
+		if (!budgetCheck.valid) {
+			throw new PluginError(
+				budgetCheck.errors[0],
+				ErrorCode.LLM_BUDGET_EXCEEDED,
+				true
+			);
+		}
+
+		// Enqueue request (rate limiting)
+		return this.enqueueRequest(async () => {
+			try {
+				const prompt = this.buildClaimExtractionPrompt(
+					sanitized,
+					context
+				);
+				const result = await this.callLLM(prompt);
+
+				// Track usage
+				const usage = result.usage;
+				await this.trackUsage(
+					this.plugin.settings.llm.modelId,
+					usage.promptTokens,
+					usage.completionTokens
+				);
+
+				return result.object.claims;
+			} catch (error) {
+				console.error('LLM claim extraction failed:', error);
+				return []; // Return empty array to trigger fallback
+			}
+		});
+	}
+
+	/**
+	 * Build prompt for claim extraction
+	 */
+	private buildClaimExtractionPrompt(
+		text: string,
+		context?: string
+	): string {
+		return `You are an expert at extracting factual claims from text and structuring them
+as Subject-Predicate-Object triples for a knowledge graph.
+
+TASK: Analyze the following text and extract all factual claims that can be
+represented as triples.
+
+${context ? `CONTEXT:\n${context}\n\n` : ''}===== BEGIN USER TEXT =====
+${text}
+===== END USER TEXT =====
+
+GUIDELINES:
+1. Only extract factual, verifiable claims - not opinions, questions, or hedged statements
+2. Each claim should be a clear Subject-Predicate-Object triple
+3. Disambiguate entities when needed (e.g., "Apple" -> "Apple Inc. (technology company)")
+4. Use canonical predicates when possible (e.g., "is a", "created", "uses", "has")
+5. Assign confidence scores based on how clear and unambiguous the claim is
+6. Suggest improvements if the claim could be stated more clearly
+7. Add warnings for claims that are subjective, time-sensitive, or potentially contentious
+
+EXCLUSION CRITERIA:
+- Questions (ends with ?)
+- First-person opinions ("I think...", "I believe...")
+- Hedged statements ("might be", "could be", "possibly")
+- Incomplete sentences
+- Metaphors or figurative language
+
+Return all valid claims found in the text.`;
+	}
+
+	/**
+	 * Call LLM with structured output using Zod schema
+	 */
+	private async callLLM(prompt: string): Promise<any> {
+		const { generateObject } = await import('ai');
+		const { ClaimExtractionSchema } = await import('../types/llm');
+
+		const provider = this.plugin.settings.llm.provider;
+		const modelId = this.plugin.settings.llm.modelId;
+
+		// Get model function based on provider
+		let model;
+		switch (provider) {
+			case 'anthropic':
+				model = this.llmClient(modelId);
+				break;
+			case 'openai':
+			case 'openrouter':
+				model = this.llmClient(modelId);
+				break;
+			case 'google':
+				model = this.llmClient(modelId);
+				break;
+			default:
+				throw new PluginError(
+					LLM_ERRORS.INVALID_PROVIDER,
+					ErrorCode.LLM,
+					true
+				);
+		}
+
+		return await generateObject({
+			model,
+			schema: ClaimExtractionSchema,
+			prompt,
+		});
 	}
 
 }

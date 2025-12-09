@@ -31,6 +31,18 @@ export interface ClaimDraft {
 }
 
 /**
+ * Extraction pattern identifier
+ */
+export type ExtractionPattern =
+	| 'is-a'
+	| 'is'
+	| 'has'
+	| 'uses'
+	| 'passive'
+	| 'verb'
+	| 'llm'; // LLM-extracted claim
+
+/**
  * Suggested triple structure from text parsing
  */
 export interface TripleSuggestion {
@@ -38,14 +50,42 @@ export interface TripleSuggestion {
 	predicate: string;
 	object: string;
 	confidence: number; // 0-1, how confident the parser is
-	pattern: string; // Which pattern was matched
+	pattern: ExtractionPattern; // Which pattern was matched
+
+	// Optional LLM metadata
+	llmMetadata?: {
+		subjectType:
+			| 'person'
+			| 'organization'
+			| 'concept'
+			| 'thing'
+			| 'place'
+			| 'event'
+			| 'unknown';
+		subjectDisambiguation?: string;
+		subjectConfidence: number;
+		objectType:
+			| 'person'
+			| 'organization'
+			| 'concept'
+			| 'thing'
+			| 'place'
+			| 'event'
+			| 'unknown';
+		objectDisambiguation?: string;
+		objectConfidence: number;
+		predicateAlternatives: string[];
+		reasoning: string;
+		suggestedImprovement?: string;
+		warnings?: string[];
+	};
 }
 
 /**
- * Regex pattern for extracting triples
+ * Regex pattern definition for extracting triples
  */
-export interface ExtractionPattern {
-	name: string;
+export interface ExtractionPatternDef {
+	name: ExtractionPattern;
 	regex: RegExp;
 	confidence: number; // Base confidence for this pattern
 	description: string; // What this pattern matches

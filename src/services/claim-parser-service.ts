@@ -1,21 +1,25 @@
 /**
  * Claim Parser Service
- * Stateless service for parsing text into triples using regex heuristics
+ * Stateless service for parsing text into triples using regex heuristics or LLM
  */
 
 import type IntuitionPlugin from '../main';
 import { BaseService } from './base-service';
+import { LLMService } from './llm-service';
+import type { ExtractedClaimLLM } from '../types/llm';
 import {
 	TripleSuggestion,
-	ExtractionPattern,
+	ExtractionPatternDef,
 	ClaimValidation,
 } from '../types';
 
 export class ClaimParserService extends BaseService {
-	private patterns: ExtractionPattern[] = [];
+	private patterns: ExtractionPatternDef[] = [];
+	private llmService: LLMService;
 
 	constructor(plugin: IntuitionPlugin) {
 		super(plugin);
+		this.llmService = plugin.llmService;
 	}
 
 	/**
@@ -33,25 +37,78 @@ export class ClaimParserService extends BaseService {
 	}
 
 	/**
-	 * Parse text and extract a triple structure
+	 * Extract triple from text using LLM (if available) or regex fallback
 	 * @param text - The text to parse into a triple
 	 * @returns A triple suggestion with confidence score, or null if no pattern matches
 	 */
-	parseText(text: string): TripleSuggestion | null {
-		// Clean the text
+	async extractTriple(text: string): Promise<TripleSuggestion | null> {
+		// Clean the text first
 		const cleaned = text
-			.replace(/[.!?]+$/, '') // Remove trailing punctuation
-			.replace(/\s+/g, ' ') // Normalize whitespace
+			.replace(/[.!?]+$/, '')
+			.replace(/\s+/g, ' ')
 			.trim();
 
+		// Try LLM first if available and enabled
+		if (
+			this.llmService?.isAvailable() &&
+			this.plugin.settings.llm.features.claimExtraction
+		) {
+			try {
+				const llmResults = await this.llmService.extractClaims(
+					cleaned
+				);
+				if (llmResults.length > 0) {
+					return this.convertLLMResult(llmResults[0]);
+				}
+			} catch (error) {
+				// Silent fallback - LLM failures should not block regex
+				console.debug(
+					'LLM extraction failed, falling back to regex:',
+					error
+				);
+			}
+		}
+
+		// Fall back to regex patterns
+		return this.extractTripleRegex(cleaned);
+	}
+
+	/**
+	 * Convert LLM result to TripleSuggestion format
+	 */
+	private convertLLMResult(
+		llmClaim: ExtractedClaimLLM
+	): TripleSuggestion {
+		return {
+			subject: llmClaim.subject.text,
+			predicate: llmClaim.predicate.normalized,
+			object: llmClaim.object.text,
+			confidence: llmClaim.confidence,
+			pattern: 'llm',
+			llmMetadata: {
+				subjectType: llmClaim.subject.type,
+				subjectDisambiguation: llmClaim.subject.disambiguation,
+				subjectConfidence: llmClaim.subject.confidence,
+				objectType: llmClaim.object.type,
+				objectDisambiguation: llmClaim.object.disambiguation,
+				objectConfidence: llmClaim.object.confidence,
+				predicateAlternatives: llmClaim.predicate.alternatives,
+				reasoning: llmClaim.reasoning,
+				suggestedImprovement: llmClaim.suggestedImprovement,
+				warnings: llmClaim.warnings,
+			},
+		};
+	}
+
+	/**
+	 * Extract triple using regex patterns (fallback when LLM unavailable)
+	 */
+	private extractTripleRegex(cleaned: string): TripleSuggestion | null {
 		// Try each pattern
 		for (const pattern of this.patterns) {
 			const match = cleaned.match(pattern.regex);
 			if (match) {
-				const suggestion = this.extractFromMatch(
-					match,
-					pattern
-				);
+				const suggestion = this.extractFromMatch(match, pattern);
 				if (suggestion) {
 					return suggestion;
 				}
@@ -113,7 +170,7 @@ export class ClaimParserService extends BaseService {
 	/**
 	 * Initialize extraction patterns (ordered by specificity)
 	 */
-	private initializePatterns(): ExtractionPattern[] {
+	private initializePatterns(): ExtractionPatternDef[] {
 		return [
 			// "X is a Y" / "X is an Y"
 			{
@@ -165,7 +222,7 @@ export class ClaimParserService extends BaseService {
 	 */
 	private extractFromMatch(
 		match: RegExpMatchArray,
-		pattern: ExtractionPattern
+		pattern: ExtractionPatternDef
 	): TripleSuggestion | null {
 		try {
 			let subject: string;
