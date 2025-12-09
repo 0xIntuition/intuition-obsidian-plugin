@@ -141,3 +141,52 @@ export const LLM_PROVIDERS: Record<LLMProvider, LLMProviderConfig> = {
 		docsUrl: 'https://aistudio.google.com/apikey',
 	},
 };
+
+/**
+ * Zod schemas for LLM structured output
+ */
+import { z } from 'zod';
+
+// Entity schema (subject/object)
+export const EntitySchema = z.object({
+	text: z.string(),
+	type: z.enum([
+		'person',
+		'organization',
+		'concept',
+		'thing',
+		'place',
+		'event',
+		'unknown',
+	]),
+	disambiguation: z.string().optional(),
+	confidence: z.number().min(0).max(1),
+});
+
+// Predicate schema
+export const PredicateSchema = z.object({
+	text: z.string(),
+	normalized: z.string(),
+	alternatives: z.array(z.string()),
+});
+
+// Single claim schema
+export const ExtractedClaimLLMSchema = z.object({
+	subject: EntitySchema,
+	predicate: PredicateSchema,
+	object: EntitySchema,
+	originalSentence: z.string(),
+	confidence: z.number().min(0).max(1),
+	reasoning: z.string(),
+	suggestedImprovement: z.string().optional(),
+	warnings: z.array(z.string()).optional(),
+});
+
+// Response schema with usage
+export const ClaimExtractionSchema = z.object({
+	claims: z.array(ExtractedClaimLLMSchema),
+});
+
+// TypeScript types derived from schemas
+export type ExtractedClaimLLM = z.infer<typeof ExtractedClaimLLMSchema>;
+export type EntityType = z.infer<typeof EntitySchema>['type'];

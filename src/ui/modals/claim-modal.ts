@@ -11,6 +11,7 @@ import {
 	ClaimStatus,
 	AtomReference,
 	TripleData,
+	TripleSuggestion,
 } from '../../types';
 
 export class ClaimModal extends Modal {
@@ -33,6 +34,9 @@ export class ClaimModal extends Modal {
 	private actionsEl: HTMLElement;
 	private submitButton: HTMLButtonElement;
 	private cancelButton: HTMLButtonElement;
+
+	// LLM-related
+	private llmMetadataEl: HTMLElement | null = null;
 
 	constructor(
 		app: App,
@@ -93,8 +97,10 @@ export class ClaimModal extends Modal {
 		this.actionsEl = contentEl.createDiv({ cls: 'claim-actions' });
 		this.renderActions();
 
-		// Auto-extract triple from text
-		this.autoExtract();
+		// Auto-extract triple from text (fire and forget - don't block modal)
+		this.autoExtract().catch(error => {
+			console.debug('Auto-extraction failed:', error);
+		});
 	}
 
 	onClose() {
@@ -539,21 +545,117 @@ export class ClaimModal extends Modal {
 	/**
 	 * Auto-extract triple from text
 	 */
-	private autoExtract(): void {
-		const suggestion =
-			this.plugin.claimParserService.parseText(this.selectedText);
+	private async autoExtract(): Promise<void> {
+		try {
+			const suggestion =
+				await this.plugin.claimParserService.extractTriple(
+					this.selectedText
+				);
 
-		if (
-			!suggestion ||
-			suggestion.confidence < ClaimModal.MIN_AUTO_SUGGESTION_CONFIDENCE
-		) {
-			return;
+			if (
+				!suggestion ||
+				suggestion.confidence <
+					ClaimModal.MIN_AUTO_SUGGESTION_CONFIDENCE
+			) {
+				return;
+			}
+
+			// Show notice with suggested structure
+			const confidencePercent = Math.round(
+				suggestion.confidence * 100
+			);
+			const source = suggestion.pattern === 'llm' ? 'AI' : 'Pattern';
+
+			this.plugin.noticeManager.info(
+				`${source} Suggestion (${confidencePercent}% confidence): ${suggestion.subject} → ${suggestion.predicate} → ${suggestion.object}`
+			);
+
+			// If LLM-powered, show enhanced UI
+			if (suggestion.pattern === 'llm' && suggestion.llmMetadata) {
+				this.renderLLMMetadata(suggestion);
+			}
+		} catch (error) {
+			console.debug('Auto-extraction failed:', error);
+		}
+	}
+
+	/**
+	 * Render LLM confidence and metadata UI
+	 */
+	private renderLLMMetadata(suggestion: TripleSuggestion): void {
+		if (!suggestion.llmMetadata) return;
+
+		const metadata = suggestion.llmMetadata;
+
+		// Clear existing metadata display
+		if (this.llmMetadataEl) {
+			this.llmMetadataEl.remove();
 		}
 
-		// Show notice with suggested structure
-		const confidencePercent = Math.round(suggestion.confidence * 100);
-		this.plugin.noticeManager.info(
-			`Suggestion (${confidencePercent}% confidence): ${suggestion.subject} → ${suggestion.predicate} → ${suggestion.object}`
+		// Create metadata section after triple inputs
+		this.llmMetadataEl = this.tripleInputsEl.createDiv({
+			cls: 'claim-llm-metadata',
+		});
+
+		// Confidence badge
+		const badgeEl = this.llmMetadataEl.createDiv({
+			cls: 'claim-llm-badge',
+		});
+		const avgConfidence =
+			(metadata.subjectConfidence + metadata.objectConfidence) / 2;
+		const confidenceClass =
+			avgConfidence >= 0.8
+				? 'high-confidence'
+				: avgConfidence >= 0.5
+				? 'medium-confidence'
+				: 'low-confidence';
+		badgeEl.addClass(confidenceClass);
+		badgeEl.setText(
+			`AI Extracted (${Math.round(suggestion.confidence * 100)}% confidence)`
+		);
+
+		// Reasoning
+		if (metadata.reasoning) {
+			const reasoningEl = this.llmMetadataEl.createDiv({
+				cls: 'llm-reasoning',
+			});
+			reasoningEl.createEl('strong', {
+				text: 'Why this extraction:',
+			});
+			reasoningEl.createEl('p', { text: metadata.reasoning });
+		}
+
+		// Suggested improvement
+		if (metadata.suggestedImprovement) {
+			const improvementEl = this.llmMetadataEl.createDiv({
+				cls: 'llm-improvement',
+			});
+			improvementEl.createEl('strong', {
+				text: 'Suggested improvement:',
+			});
+			improvementEl.createEl('p', {
+				text: metadata.suggestedImprovement,
+			});
+		}
+
+		// Warnings
+		if (metadata.warnings && metadata.warnings.length > 0) {
+			const warningEl = this.llmMetadataEl.createDiv({
+				cls: 'claim-llm-warnings',
+			});
+			warningEl.createEl('strong', { text: 'Warnings:' });
+			const warningList = warningEl.createEl('ul');
+			for (const warning of metadata.warnings) {
+				warningList.createEl('li', { text: warning });
+			}
+		}
+
+		// Entity types (subtle display)
+		const typesEl = this.llmMetadataEl.createDiv({
+			cls: 'llm-entity-types',
+		});
+		typesEl.setText(
+			`Types: ${metadata.subjectType} → ${metadata.objectType}`
 		);
 	}
 

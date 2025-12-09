@@ -457,3 +457,60 @@
 	background: rgba(239, 68, 68, 0.1);
 	color: var(--text-error);
 }
+
+/* ============================================================================
+   LLM Metadata Display (for ClaimModal)
+   ========================================================================= */
+
+/* LLM Metadata Container */
+.claim-llm-metadata {
+	margin-top: 16px;
+	padding: 12px;
+	background: var(--background-secondary);
+	border-radius: 6px;
+}
+
+/* Reasoning and Improvement Sections */
+.llm-reasoning,
+.llm-improvement {
+	margin: 8px 0;
+	font-size: 13px;
+}
+
+.llm-reasoning strong,
+.llm-improvement strong {
+	display: block;
+	margin-bottom: 4px;
+	font-size: 12px;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.llm-reasoning p,
+.llm-improvement p {
+	margin: 0;
+	color: var(--text-normal);
+}
+
+/* Warnings Section */
+.claim-llm-warnings {
+	margin: 12px 0;
+	padding: 12px;
+	border-radius: 4px;
+	background: rgba(234, 179, 8, 0.1);
+	border-left: 3px solid var(--text-warning);
+	font-size: 13px;
+}
+
+.claim-llm-warnings ul {
+	margin: 8px 0 0 0;
+	padding-left: 20px;
+}
+
+/* Entity Types Display */
+.llm-entity-types {
+	margin-top: 8px;
+	font-size: 11px;
+	color: var(--text-muted);
+	font-style: italic;
+}
