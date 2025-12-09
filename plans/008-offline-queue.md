@@ -827,7 +827,333 @@ export class QueuePanel extends ItemView {
 - [ ] Status bar shows queue count
 - [ ] Automatic retry works
 
-## Testing
+## Testing Strategy
+
+### Test Files to Create
+
+```
+src/
+  types/
+    queue.spec.ts               # Queue type tests
+    database.spec.ts            # Database type tests
+  services/
+    database-service.spec.ts    # IndexedDB wrapper tests
+    queue-service.spec.ts       # Queue management tests
+    connectivity-service.spec.ts # Network monitoring tests
+  ui/
+    views/
+      queue-panel.spec.ts       # Panel rendering tests
+
+tests/
+  integration/
+    offline-queue.integration.spec.ts  # End-to-end queue tests
+  fixtures/
+    queue.ts                    # Queue item fixtures
+  mocks/
+    idb-extended.ts             # Extended IndexedDB mocks
+```
+
+### Unit Tests
+
+#### src/services/database-service.spec.ts (~35 tests, 95% coverage)
+
+**Initialization (5 tests)**
+- Should create database with correct name and version
+- Should create queue object store with indexes
+- Should create cache object store with indexes
+- Should handle upgrade from previous version
+- Should throw error if database fails to open
+
+**Queue Operations (12 tests)**
+- Should add item to queue
+- Should retrieve item by ID
+- Should return undefined for non-existent item
+- Should get all queue items
+- Should get items by status
+- Should update existing item
+- Should update updatedAt on update
+- Should delete item by ID
+- Should handle delete of non-existent item
+- Should clear entire queue
+- Should maintain index integrity after operations
+- Should handle concurrent operations safely
+
+**Cache Operations (10 tests)**
+- Should set cache entry with TTL
+- Should get valid cache entry
+- Should return null for expired cache
+- Should delete expired entry on get
+- Should clear expired cache entries
+- Should clear all cache entries
+- Should handle complex data types
+- Should preserve data integrity
+- Should handle very large cache entries
+- Should track timestamp correctly
+
+**Error Handling (5 tests)**
+- Should throw if operations called before initialize
+- Should handle IndexedDB quota exceeded
+- Should recover from corrupted data
+- Should handle transaction abort
+- Should cleanup on close
+
+**Mock Requirements:**
+```typescript
+// tests/mocks/idb-extended.ts
+export const createMockIDB = () => {
+  const stores = new Map<string, Map<string, any>>();
+  stores.set('queue', new Map());
+  stores.set('cache', new Map());
+
+  return {
+    put: vi.fn((store, value) => stores.get(store)?.set(value.id || value.key, value)),
+    get: vi.fn((store, key) => stores.get(store)?.get(key)),
+    getAll: vi.fn((store) => Array.from(stores.get(store)?.values() || [])),
+    getAllFromIndex: vi.fn(),
+    delete: vi.fn((store, key) => stores.get(store)?.delete(key)),
+    clear: vi.fn((store) => stores.get(store)?.clear()),
+    close: vi.fn(),
+  };
+};
+```
+
+#### src/services/connectivity-service.spec.ts (~30 tests, 95% coverage)
+
+**Initialization (4 tests)**
+- Should perform initial connectivity check
+- Should register online/offline event listeners
+- Should start periodic check
+- Should use correct API URL for checks
+
+**Status Changes (8 tests)**
+- Should update status to online on successful check
+- Should update status to offline on failed check
+- Should update status on browser online event
+- Should update status on browser offline event
+- Should emit status-change event
+- Should emit reconnected event on offline→online
+- Should not emit event if status unchanged
+- Should handle 'checking' intermediate state
+
+**Connectivity Check (8 tests)**
+- Should send health check query
+- Should timeout after 5 seconds
+- Should handle network errors gracefully
+- Should handle non-OK HTTP responses
+- Should abort request on timeout
+- Should parse response correctly
+- Should handle malformed responses
+- Should clear timeout on success
+
+**Periodic Checks (6 tests)**
+- Should check every 30s when online
+- Should check every 10s when offline
+- Should reschedule after each check
+- Should use adaptive intervals
+- Should stop periodic check on cleanup
+- Should handle check failures without crashing
+
+**Cleanup (4 tests)**
+- Should remove event listeners on cleanup
+- Should clear pending timeouts
+- Should stop periodic checks
+- Should handle multiple cleanup calls
+
+#### src/services/queue-service.spec.ts (~45 tests, 90% coverage)
+
+**Add to Queue (8 tests)**
+- Should create queue item with correct structure
+- Should generate unique ID
+- Should set initial status to pending
+- Should store draft and stake config
+- Should trigger item-added event
+- Should process immediately if online
+- Should not process if offline
+- Should return item ID
+
+**Queue Retrieval (6 tests)**
+- Should get all items
+- Should get pending items
+- Should get retrying items
+- Should combine pending and retrying for processing
+- Should sort by createdAt
+- Should calculate stats correctly
+
+**Retry Functionality (5 tests)**
+- Should reset status to pending
+- Should reset attempt count
+- Should clear error
+- Should trigger processing if online
+- Should emit item-updated event
+
+**Remove & Clear (4 tests)**
+- Should remove single item
+- Should emit item-removed event
+- Should clear completed items only
+- Should emit queue-updated event
+
+**Process Queue (10 tests)**
+- Should skip if already processing
+- Should skip if offline
+- Should skip if wallet locked
+- Should process pending items in order
+- Should emit processing-started event
+- Should emit processing-finished event
+- Should update item status during processing
+- Should handle transaction success
+- Should show notification on success
+- Should handle multiple items sequentially
+
+**Retry Logic (8 tests)**
+- Should increment attempt count
+- Should set status to retrying on failure
+- Should set status to failed after max retries
+- Should respect retry delay
+- Should use exponential backoff
+- Should store error message
+- Should show error notification on final failure
+- Should schedule next retry
+
+**Reconnection Handling (4 tests)**
+- Should listen for reconnected event
+- Should trigger processQueue on reconnection
+- Should process all pending items
+- Should handle reconnection during processing
+
+#### src/ui/views/queue-panel.spec.ts (~25 tests, 85% coverage)
+
+**Panel Setup (4 tests)**
+- Should register correct view type
+- Should set correct display text
+- Should set correct icon
+- Should subscribe to queue events
+
+**Rendering - Header (5 tests)**
+- Should render panel title
+- Should render pending count
+- Should render processing count
+- Should render failed count
+- Should render connection status indicator
+
+**Rendering - Items (8 tests)**
+- Should render all queue items
+- Should sort by status priority
+- Should display status icon correctly
+- Should display item title (triple format)
+- Should display created timestamp
+- Should display error message for failed items
+- Should render retry button for failed items
+- Should render remove button
+
+**User Interactions (5 tests)**
+- Should handle retry button click
+- Should handle remove button click
+- Should handle clear completed click
+- Should refresh on event updates
+- Should handle empty queue state
+
+**Connection Status (3 tests)**
+- Should show online indicator correctly
+- Should show offline indicator correctly
+- Should show checking indicator correctly
+
+### Integration Tests
+
+#### tests/integration/offline-queue.integration.spec.ts (~25 tests)
+
+**Online Queue Processing (6 tests)**
+- Should add and process item immediately when online
+- Should process multiple items in sequence
+- Should update UI during processing
+- Should persist completed items in database
+- Should refresh balance after successful publish
+- Should annotate note on completion
+
+**Offline Queuing (6 tests)**
+- Should queue item when offline
+- Should persist queue to IndexedDB
+- Should restore queue on plugin reload
+- Should show pending status in UI
+- Should not attempt processing offline
+- Should handle rapid offline additions
+
+**Reconnection Flow (5 tests)**
+- Should process queue on reconnection
+- Should handle items added while offline
+- Should maintain item order
+- Should show processing progress
+- Should handle partial failures gracefully
+
+**Retry Behavior (5 tests)**
+- Should retry failed items automatically
+- Should use exponential backoff
+- Should mark as failed after max retries
+- Should allow manual retry of failed items
+- Should preserve original draft data
+
+**Database Persistence (3 tests)**
+- Should survive plugin restart
+- Should handle database upgrade
+- Should recover from corrupted entries
+
+### Test Fixtures
+
+```typescript
+// tests/fixtures/queue.ts
+export const mockQueueItem: QueueItem = {
+  id: 'queue-1',
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+  type: 'publishClaim',
+  status: 'pending',
+  draft: {
+    subject: { type: 'existing', label: 'Ethereum', termId: '1' },
+    predicate: { type: 'existing', label: 'is', termId: '2' },
+    object: { type: 'new', label: 'decentralized' },
+  },
+  stakeConfig: {
+    amount: BigInt(0.01e18),
+    position: 'for',
+  },
+  attempts: 0,
+  lastAttempt: null,
+  error: null,
+};
+
+export const mockFailedQueueItem: QueueItem = {
+  ...mockQueueItem,
+  id: 'queue-2',
+  status: 'failed',
+  attempts: 3,
+  lastAttempt: Date.now() - 5000,
+  error: 'Transaction reverted',
+};
+
+export const mockCompletedQueueItem: QueueItem = {
+  ...mockQueueItem,
+  id: 'queue-3',
+  status: 'completed',
+  result: {
+    tripleId: '0x123...',
+    transactionHashes: ['0xabc...'],
+  },
+};
+```
+
+### Coverage Targets
+
+| File | Target | Notes |
+|------|--------|-------|
+| database-service.ts | 95% | Core storage, must be reliable |
+| connectivity-service.ts | 95% | Network detection critical |
+| queue-service.ts | 90% | Complex state management |
+| queue-panel.ts | 85% | UI rendering |
+| types/queue.ts | 100% | Type definitions |
+| types/database.ts | 100% | Type definitions |
+
+**Overall Plan 008 Target: 90%+ coverage, ~135 tests**
+
+### Manual Testing Checklist
 1. Add item to queue while online - verify processes
 2. Go offline, add item - verify queued
 3. Come back online - verify processes

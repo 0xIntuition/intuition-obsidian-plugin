@@ -552,7 +552,340 @@ this.addCommand({
 - [ ] Badges are clickable (for hover card)
 - [ ] Loading state shows while fetching
 
-## Testing
+## Testing Strategy
+
+### Test Files to Create
+
+```
+src/
+  types/
+    decorations.spec.ts          # Decoration type tests
+  services/
+    decoration-service.spec.ts   # Decoration management tests
+    entity-detector.spec.ts      # Entity detection tests
+  ui/
+    extensions/
+      trust-decoration.spec.ts   # CodeMirror extension tests
+    components/
+      trust-badge.spec.ts        # Badge rendering tests
+
+tests/
+  integration/
+    entity-decorations.integration.spec.ts  # End-to-end decoration tests
+  fixtures/
+    decorations.ts               # Decoration test fixtures
+    entities.ts                  # Entity match fixtures
+```
+
+### Unit Tests
+
+#### src/services/entity-detector.spec.ts (~30 tests, 95% coverage)
+
+**Wikilink Detection (10 tests)**
+- Should detect basic wikilink [[Entity]]
+- Should detect wikilink with alias [[Entity|Alias]]
+- Should detect multiple wikilinks in content
+- Should capture correct positions (from/to)
+- Should extract text without alias
+- Should handle nested brackets correctly
+- Should handle wikilink at start of content
+- Should handle wikilink at end of content
+- Should handle consecutive wikilinks
+- Should ignore malformed wikilinks
+
+**Tag Detection (6 tests)**
+- Should detect hashtag #EntityName
+- Should detect multiple hashtags
+- Should capture correct positions
+- Should handle hyphens and underscores
+- Should not match numbers-only tags
+- Should stop at special characters
+
+**Entity Normalization (8 tests)**
+- Should convert to lowercase
+- Should replace hyphens with spaces
+- Should replace underscores with spaces
+- Should collapse multiple spaces
+- Should trim whitespace
+- Should handle mixed case input
+- Should handle empty string
+- Should handle special characters
+
+**Edge Cases (6 tests)**
+- Should return empty array for no entities
+- Should handle very long content efficiently
+- Should handle unicode characters
+- Should handle code blocks (skip detection)
+- Should handle frontmatter (skip detection)
+- Should reset regex state between calls
+
+#### src/services/decoration-service.spec.ts (~40 tests, 90% coverage)
+
+**Entity Detection Integration (4 tests)**
+- Should call entity detector with content
+- Should return EntityMatch array
+- Should delegate to EntityDetector correctly
+- Should handle empty content
+
+**getDecorations() - Cache Handling (8 tests)**
+- Should return cached data for known entities
+- Should return loading status for unknown entities
+- Should schedule batch lookup for unknowns
+- Should handle mixed cached/uncached entities
+- Should update cache after lookup
+- Should respect cache TTL
+- Should invalidate stale cache
+- Should handle cache errors gracefully
+
+**Batch Lookup (10 tests)**
+- Should debounce lookups (100ms)
+- Should batch multiple entities into single lookup
+- Should handle lookup success
+- Should handle lookup failure
+- Should emit decorations-updated event
+- Should update entityAtomMap on success
+- Should set null for not-found entities
+- Should find exact matches preferentially
+- Should handle partial matches
+- Should clear pending lookups after execution
+
+**createDecoration() (8 tests)**
+- Should create decoration for found entity
+- Should create decoration for not-found entity
+- Should calculate trust score from vault data
+- Should cap trust score at 100
+- Should handle null atomData
+- Should set correct status
+- Should include entity reference
+- Should include atomId
+
+**getBadgeData() (6 tests)**
+- Should return null for non-found status
+- Should return correct score
+- Should determine correct tier
+- Should include total staked
+- Should include staker count
+- Should handle missing vault data
+
+**Cache Management (4 tests)**
+- Should clear entity atom map
+- Should clear cache service
+- Should handle clear on empty cache
+- Should emit update after clear
+
+#### src/ui/extensions/trust-decoration.spec.ts (~35 tests, 85% coverage)
+
+**TrustBadgeWidget - Rendering (12 tests)**
+- Should create span element
+- Should add correct CSS class
+- Should show '...' for loading status
+- Should show '?' for not-found status
+- Should show percentage for found status
+- Should apply correct tier color
+- Should set title with trust info
+- Should add click handler for found entities
+- Should handle high trust tier (green)
+- Should handle medium trust tier (yellow)
+- Should handle low trust tier (orange)
+- Should handle negative trust tier (red)
+
+**TrustBadgeWidget - Equality (4 tests)**
+- Should return true for same entity and status
+- Should return false for different entity
+- Should return false for different status
+- Should return false for different trust score
+
+**ViewPlugin - Initialization (5 tests)**
+- Should start with empty decorations
+- Should call updateDecorations on init
+- Should subscribe to decorations-updated event
+- Should respect enableDecorations setting
+- Should handle disabled state correctly
+
+**ViewPlugin - Updates (8 tests)**
+- Should update on document change
+- Should update on viewport change
+- Should skip update when disabled
+- Should sort decorations by position
+- Should add widgets after wikilinks
+- Should batch animation frame updates
+- Should prevent duplicate updates
+- Should handle rapid updates correctly
+
+**ViewPlugin - Settings Integration (6 tests)**
+- Should read enableDecorations setting
+- Should clear decorations when disabled
+- Should restore decorations when enabled
+- Should respond to setting changes
+- Should persist preference across sessions
+- Should handle toggle command
+
+#### src/types/decorations.spec.ts (~15 tests, 100% coverage)
+
+**getTrustTier() (6 tests)**
+- Should return 'high' for score >= 80
+- Should return 'medium' for score 60-79
+- Should return 'low' for score 40-59
+- Should return 'negative' for score < 40
+- Should return 'unknown' for null
+- Should handle boundary values correctly
+
+**getTrustColor() (6 tests)**
+- Should return green for high tier
+- Should return yellow for medium tier
+- Should return orange for low tier
+- Should return red for negative tier
+- Should return gray for unknown tier
+- Should return valid CSS colors
+
+**Type Validations (3 tests)**
+- Should validate EntityMatch structure
+- Should validate EntityDecoration structure
+- Should validate TrustBadgeData structure
+
+### Integration Tests
+
+#### tests/integration/entity-decorations.integration.spec.ts (~25 tests)
+
+**Decoration Flow (8 tests)**
+- Should detect wikilinks in note content
+- Should fetch atom data for entities
+- Should display badges after wikilinks
+- Should update badges on content change
+- Should handle multiple wikilinks
+- Should show loading then resolved state
+- Should cache results across edits
+- Should handle new entities added
+
+**Trust Score Display (6 tests)**
+- Should show high trust badge correctly
+- Should show medium trust badge correctly
+- Should show low trust badge correctly
+- Should show unknown badge for missing entities
+- Should update badge on data refresh
+- Should handle entities with no stake
+
+**User Interactions (5 tests)**
+- Should handle badge click
+- Should integrate with hover cards (Plan 010)
+- Should toggle via command
+- Should respect settings preference
+- Should persist toggle state
+
+**Performance (6 tests)**
+- Should handle 50+ wikilinks efficiently
+- Should batch API requests
+- Should debounce rapid changes
+- Should not block editor typing
+- Should lazy-load off-screen entities
+- Should handle very long documents
+
+### Test Fixtures
+
+```typescript
+// tests/fixtures/decorations.ts
+export const mockEntityMatch: EntityMatch = {
+  text: 'Ethereum',
+  type: 'wikilink',
+  position: { from: 5, to: 17 },
+};
+
+export const mockEntityDecoration: EntityDecoration = {
+  entity: mockEntityMatch,
+  atomId: 'atom-123',
+  atomData: {
+    id: '1',
+    termId: 'atom-123',
+    label: 'Ethereum',
+    type: 'entity',
+    vault: {
+      id: 'vault-1',
+      totalAssets: BigInt(100e18),
+      totalShares: BigInt(100e18),
+      currentSharePrice: BigInt(1e18),
+      positionCount: 50,
+    },
+  },
+  trustScore: 85,
+  status: 'found',
+};
+
+export const mockNotFoundDecoration: EntityDecoration = {
+  entity: { text: 'Unknown', type: 'wikilink', position: { from: 0, to: 11 } },
+  atomId: null,
+  atomData: null,
+  trustScore: null,
+  status: 'not-found',
+};
+
+export const mockTrustBadgeData: TrustBadgeData = {
+  score: 85,
+  tier: 'high',
+  totalStaked: BigInt(100e18),
+  stakerCount: 50,
+};
+
+// tests/fixtures/entities.ts
+export const testNoteContent = `
+# My Notes
+
+This note discusses [[Ethereum]] and [[Bitcoin]].
+
+## Related Topics
+- [[Blockchain]] technology
+- [[Smart Contracts|Smart contracts]] are important
+- #cryptocurrency #defi
+
+Unknown entity: [[FooBar123]]
+`;
+
+export const expectedEntities: EntityMatch[] = [
+  { text: 'Ethereum', type: 'wikilink', position: { from: 31, to: 43 } },
+  { text: 'Bitcoin', type: 'wikilink', position: { from: 48, to: 59 } },
+  { text: 'Blockchain', type: 'wikilink', position: { from: 83, to: 97 } },
+  { text: 'Smart Contracts', type: 'wikilink', position: { from: 114, to: 145 } },
+  { text: 'FooBar123', type: 'wikilink', position: { from: 194, to: 207 } },
+];
+```
+
+### Mock Requirements
+
+```typescript
+// CodeMirror view mock for extension tests
+export const createMockEditorView = (content: string) => ({
+  state: {
+    doc: {
+      toString: () => content,
+    },
+  },
+  viewport: { from: 0, to: content.length },
+});
+
+// Decoration service mock
+export const createMockDecorationService = () => ({
+  detectEntities: vi.fn().mockReturnValue([]),
+  getDecorations: vi.fn().mockResolvedValue([]),
+  getBadgeData: vi.fn().mockReturnValue(null),
+  clearCache: vi.fn(),
+  on: vi.fn(),
+  off: vi.fn(),
+  trigger: vi.fn(),
+});
+```
+
+### Coverage Targets
+
+| File | Target | Notes |
+|------|--------|-------|
+| entity-detector.ts | 95% | Regex logic, highly testable |
+| decoration-service.ts | 90% | Async operations |
+| trust-decoration.ts | 85% | CodeMirror integration |
+| types/decorations.ts | 100% | Pure functions |
+| trust-badge.ts | 90% | UI component |
+
+**Overall Plan 009 Target: 90%+ coverage, ~120 tests**
+
+### Manual Testing Checklist
 1. Create note with wikilinks like [[Ethereum]], [[Bitcoin]]
 2. Verify badges appear after each link
 3. Check colors match trust tiers

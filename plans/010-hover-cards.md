@@ -642,7 +642,295 @@ toDOM(): HTMLElement {
 - [ ] Card positions correctly (no overflow)
 - [ ] Card stays visible when hovering over it
 
-## Testing
+## Testing Strategy
+
+### Test Files to Create
+
+```
+src/
+  types/
+    hover-cards.spec.ts          # Hover card type tests
+  services/
+    hover-card-service.spec.ts   # Data fetching tests
+  ui/
+    components/
+      hover-card.spec.ts         # Card component tests
+
+tests/
+  integration/
+    hover-cards.integration.spec.ts  # End-to-end hover card tests
+  fixtures/
+    hover-cards.ts               # Hover card test fixtures
+```
+
+### Unit Tests
+
+#### src/services/hover-card-service.spec.ts (~35 tests, 95% coverage)
+
+**getHoverCardData() - Cache (6 tests)**
+- Should return cached data if within TTL
+- Should bypass cache if expired
+- Should update cache after fetch
+- Should use 1-minute cache TTL
+- Should handle cache key collisions
+- Should return null on cache miss with fetch failure
+
+**getHoverCardData() - Data Fetching (10 tests)**
+- Should fetch atom data by ID
+- Should return null if atom not found
+- Should fetch related triples
+- Should limit triples to top 5
+- Should sort triples by position count
+- Should fetch user position if wallet connected
+- Should skip user position if wallet locked
+- Should calculate trust score correctly
+- Should handle API errors gracefully
+- Should log errors on failure
+
+**fetchRelatedTriples() (6 tests)**
+- Should query triples where atom is subject
+- Should order by vault position count desc
+- Should limit to 10 results
+- Should include subject, predicate, object data
+- Should include vault data
+- Should handle empty results
+
+**fetchUserPosition() (5 tests)**
+- Should return null if no address
+- Should fetch positions for address
+- Should find matching vault position
+- Should return null if no position found
+- Should handle API errors
+
+**calculateTrustScore() (6 tests)**
+- Should return 0 if no vault
+- Should return 95 for 100+ stakers
+- Should return 85 for 50+ stakers
+- Should return 75 for 20+ stakers
+- Should return 65 for 10+ stakers
+- Should return 45-55 for 1-9 stakers
+
+**clearCache() (2 tests)**
+- Should clear all cached entries
+- Should handle empty cache
+
+#### src/ui/components/hover-card.spec.ts (~45 tests, 90% coverage)
+
+**Show/Hide Timing (10 tests)**
+- Should show card after showDelay (300ms)
+- Should hide card after hideDelay (200ms)
+- Should cancel pending hide on show
+- Should cancel pending show on scheduleHide
+- Should keep same card if same atomId
+- Should show immediately if already visible
+- Should call cancelHide correctly
+- Should cleanup timeouts on hide
+- Should handle rapid show/hide calls
+- Should use default config values
+
+**Rendering - Header (6 tests)**
+- Should render entity icon (emoji)
+- Should render entity icon (image)
+- Should render entity name
+- Should render entity type badge
+- Should handle missing icon gracefully
+- Should escape HTML in entity name
+
+**Rendering - Trust Section (6 tests)**
+- Should display trust score percentage
+- Should apply correct tier styling
+- Should show tier label
+- Should display total staked amount
+- Should display staker count
+- Should format large numbers correctly
+
+**Rendering - Claims (6 tests)**
+- Should render top claims list
+- Should show predicate and object
+- Should display consensus percentage
+- Should handle empty claims list
+- Should limit to maxClaims
+- Should handle claims without vault data
+
+**Rendering - User Position (5 tests)**
+- Should show section only if position exists
+- Should display share amount
+- Should display asset value
+- Should show P&L percentage with color
+- Should handle positive/negative P&L
+
+**Rendering - Actions (5 tests)**
+- Should render View in Explorer link
+- Should use correct explorer URL per network
+- Should open link in new tab
+- Should render Stake button
+- Should close card on stake click
+
+**Positioning (7 tests)**
+- Should position below anchor by default
+- Should center horizontally
+- Should adjust for right screen edge
+- Should adjust for left screen edge
+- Should position above if no room below
+- Should add 8px offset from anchor
+- Should handle very small viewports
+
+**Mouse Interaction (4 tests)**
+- Should keep card visible on hover
+- Should trigger scheduleHide on mouseleave
+- Should not hide while mouse on card
+- Should handle mouse enter during hide delay
+
+#### src/types/hover-cards.spec.ts (~10 tests, 100% coverage)
+
+**DEFAULT_HOVER_CONFIG (5 tests)**
+- Should have showDelay of 300ms
+- Should have hideDelay of 200ms
+- Should have maxWidth of 400px
+- Should have maxClaims of 5
+- Should be immutable
+
+**Type Validations (5 tests)**
+- Should validate HoverCardData structure
+- Should validate UserPosition structure
+- Should validate HoverCardConfig structure
+- Should allow partial config override
+- Should handle null userPosition
+
+### Integration Tests
+
+#### tests/integration/hover-cards.integration.spec.ts (~20 tests)
+
+**Badge to Card Integration (6 tests)**
+- Should show card on badge hover
+- Should pass atomId to hover service
+- Should display fetched data correctly
+- Should hide card on badge mouseleave
+- Should maintain card on card hover
+- Should integrate with decoration service
+
+**Data Display (5 tests)**
+- Should fetch and display entity info
+- Should fetch and display related claims
+- Should fetch and display user position
+- Should handle missing data gracefully
+- Should update when data changes
+
+**User Actions (5 tests)**
+- Should open explorer on link click
+- Should trigger stake flow on button click
+- Should close card after action
+- Should handle action errors
+- Should preserve context through actions
+
+**Edge Cases (4 tests)**
+- Should handle multiple badges
+- Should handle rapid hover switching
+- Should cleanup on navigation
+- Should handle network errors gracefully
+
+### Test Fixtures
+
+```typescript
+// tests/fixtures/hover-cards.ts
+export const mockHoverCardData: HoverCardData = {
+  entity: {
+    id: '1',
+    termId: 'atom-123',
+    label: 'Ethereum',
+    type: 'entity',
+    emoji: '⟠',
+    image: null,
+    vault: {
+      id: 'vault-1',
+      totalAssets: BigInt(500e18),
+      totalShares: BigInt(500e18),
+      currentSharePrice: BigInt(1e18),
+      positionCount: 75,
+    },
+  },
+  trustScore: 85,
+  totalStaked: BigInt(500e18),
+  stakerCount: 75,
+  topClaims: [
+    {
+      id: 'triple-1',
+      subject: { id: '1', termId: 'atom-123', label: 'Ethereum' },
+      predicate: { id: '2', termId: 'atom-456', label: 'is' },
+      object: { id: '3', termId: 'atom-789', label: 'decentralized' },
+      vault: { position_count: 50, current_share_price: '1000000000000000000' },
+      counter_vault: { position_count: 10, current_share_price: '1000000000000000000' },
+    },
+  ],
+  userPosition: null,
+};
+
+export const mockHoverCardDataWithPosition: HoverCardData = {
+  ...mockHoverCardData,
+  userPosition: {
+    vaultId: 'vault-1',
+    shares: BigInt(10e18),
+    assets: BigInt(11e18),
+    pnlPercent: 10.5,
+  },
+};
+
+export const mockEmptyHoverCardData: HoverCardData = {
+  entity: {
+    id: '2',
+    termId: 'atom-999',
+    label: 'Unknown Entity',
+    type: 'entity',
+    vault: null,
+  },
+  trustScore: 0,
+  totalStaked: BigInt(0),
+  stakerCount: 0,
+  topClaims: [],
+  userPosition: null,
+};
+```
+
+### Mock Requirements
+
+```typescript
+// Hover card service mock
+export const createMockHoverCardService = () => ({
+  getHoverCardData: vi.fn().mockResolvedValue(mockHoverCardData),
+  clearCache: vi.fn(),
+});
+
+// DOM positioning mock
+export const createMockBoundingRect = (overrides = {}) => ({
+  left: 100,
+  right: 200,
+  top: 100,
+  bottom: 150,
+  width: 100,
+  height: 50,
+  x: 100,
+  y: 100,
+  ...overrides,
+});
+
+// Window mock for viewport tests
+export const mockWindowDimensions = (width: number, height: number) => {
+  Object.defineProperty(window, 'innerWidth', { value: width, writable: true });
+  Object.defineProperty(window, 'innerHeight', { value: height, writable: true });
+};
+```
+
+### Coverage Targets
+
+| File | Target | Notes |
+|------|--------|-------|
+| hover-card-service.ts | 95% | Data fetching, caching |
+| hover-card.ts | 90% | UI component with positioning |
+| types/hover-cards.ts | 100% | Type definitions |
+
+**Overall Plan 010 Target: 92%+ coverage, ~90 tests**
+
+### Manual Testing Checklist
 1. Hover over trust badge - verify card appears
 2. Move mouse away - verify card hides
 3. Move mouse to card - verify it stays
