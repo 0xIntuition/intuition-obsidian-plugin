@@ -1,5 +1,6 @@
 export * from './base-service';
 export * from './cache-service';
+export * from './claim-parser-service';
 export * from './crypto-service';
 export * from './graphql-client';
 export * from './intuition-service';

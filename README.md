@@ -19,6 +19,13 @@ The Intuition Obsidian Plugin integrates [Intuition](https://intuition.systems) 
   - Rich metadata display (descriptions, types, trust indicators)
   - Create new atoms directly from search
   - Keyboard navigation support
+- **Claim Structuring Modal**: Transform selected text into structured triples
+  - Auto-extraction of Subject/Predicate/Object from natural language
+  - Search and select existing atoms or create new ones
+  - Real-time existence checking against the knowledge graph
+  - Consensus display for existing claims (FOR/AGAINST percentages)
+  - Validation and error handling
+  - Hotkey support (Cmd/Ctrl+Shift+I)
 
 ### Planned
 The plugin is under active development with 12 implementation plans:
@@ -28,7 +35,7 @@ The plugin is under active development with 12 implementation plans:
 3. **Embedded Wallet** ✅ - Secure wallet integration with key management
 4. **SDK Integration** ✅ - Connection to Intuition's protocol via GraphQL
 5. **Atom Search** ✅ - Search and browse the global knowledge graph with AI-powered semantic search
-6. **Claim Modal** - UI for creating and publishing claims
+6. **Claim Modal** ✅ - UI for structuring claims as triples with existence checking and consensus display
 7. **Publishing Flow** - Submit claims to the blockchain
 8. **Offline Queue** - Queue claims when offline
 9. **Entity Decorations** - Highlight linked entities in your notes
@@ -117,7 +124,7 @@ This project follows a phased implementation approach. Check the `plans/` direct
 - Implementation order and dependencies
 - Acceptance criteria and testing requirements
 
-Current status: **Plans 001-005 Complete** (Foundation, Settings, Wallet, SDK Integration, Atom Search)
+Current status: **Plans 001-006 Complete** (Foundation, Settings, Wallet, SDK Integration, Atom Search, Claim Modal)
 
 ## Contributing
 
