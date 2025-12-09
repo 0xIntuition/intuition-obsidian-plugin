@@ -1020,3 +1020,24 @@ export const createMockMatchingService = () => ({
 
 ## Estimated Effort
 High - NLP extraction with async matching
+
+## Related Plans
+
+### Plan 006-2: LLM Integration
+The pattern-based `ClaimExtractionService` implemented in this plan can be significantly enhanced with LLM-powered extraction. See [Plan 006-2](./006-2-use-llm.md) for:
+- More accurate claim detection using AI understanding
+- Better sentence boundary detection
+- Semantic understanding of complex sentences
+- Higher quality Subject-Predicate-Object extraction
+- Reduced false positives from pattern matching
+
+When Plan 006-2 is implemented:
+1. `ClaimExtractionService` will use LLM when available
+2. Claim indicators will show LLM confidence scores
+3. The "not-found" state can offer AI-suggested improvements
+4. Batch analysis can process entire notes efficiently
+
+**New LLM-Enabled Features for Claim Indicators:**
+- **Fact-checking**: Cross-reference claims with existing knowledge graph
+- **Relationship Discovery**: Suggest related claims the user might want to verify
+- **Consensus Summary**: Show AI-generated summaries of community positions

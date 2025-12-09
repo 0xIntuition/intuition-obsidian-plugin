@@ -224,7 +224,7 @@ export class ClaimModal extends Modal {
 				});
 				break;
 
-			case ClaimStatus.NEW:
+			case ClaimStatus.NEW: {
 				statusBox.addClass('new');
 				statusBox.createSpan({
 					text: '○ This claim does not exist yet',
@@ -246,6 +246,7 @@ export class ClaimModal extends Modal {
 					});
 				}
 				break;
+			}
 
 			case ClaimStatus.INVALID:
 				statusBox.addClass('invalid');
@@ -471,11 +472,23 @@ export class ClaimModal extends Modal {
 		this.draft.status = ClaimStatus.VALIDATING;
 		this.renderStatus();
 
+		// At this point, all terms are 'existing' type and have termId
+		const subjectId = subject.termId;
+		const predicateId = predicate.termId;
+		const objectId = object.termId;
+
+		if (!subjectId || !predicateId || !objectId) {
+			// This should not happen due to checks above, but handle defensively
+			this.draft.status = ClaimStatus.DRAFT;
+			this.renderStatus();
+			return;
+		}
+
 		try {
 			const triple = await this.plugin.intuitionService.findTriple(
-				subject.termId!,
-				predicate.termId!,
-				object.termId!
+				subjectId,
+				predicateId,
+				objectId
 			);
 
 			if (triple) {

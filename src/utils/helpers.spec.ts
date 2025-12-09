@@ -47,7 +47,9 @@ describe('truncateAddress', () => {
 	});
 
 	it('should handle null/undefined inputs', () => {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		expect(truncateAddress(null as any)).toBe('');
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		expect(truncateAddress(undefined as any)).toBe('');
 	});
 });
@@ -68,6 +70,7 @@ describe('deepMergeSettings', () => {
 			cacheSettings: {
 				ttl: 600000,
 			},
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} as any;
 
 		const result = deepMergeSettings(defaults, saved);
@@ -87,6 +90,7 @@ describe('deepMergeSettings', () => {
 		const saved = {
 			network: 'base-sepolia',
 			rpcUrl: null,
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} as any;
 
 		const result = deepMergeSettings(defaults, saved);
@@ -131,6 +135,7 @@ describe('deepMergeSettings', () => {
 					},
 				},
 			},
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} as any;
 
 		const result = deepMergeSettings(defaults, saved);

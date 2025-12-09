@@ -749,3 +749,24 @@ this.addCommand({
 
 ## Estimated Effort
 High - Core user workflow with multiple components
+
+## Related Plans
+
+### Plan 006-2: LLM Integration
+The regex-based `ClaimParserService` implemented in this plan can be enhanced with LLM-powered extraction. See [Plan 006-2](./006-2-use-llm.md) for:
+- Intelligent claim extraction using AI
+- Entity disambiguation ("Apple" -> company vs fruit)
+- Smart predicate suggestions
+- Claim improvement suggestions
+- Higher accuracy confidence scoring
+
+When Plan 006-2 is implemented, the `ClaimParserService` will:
+1. Check if LLM is enabled and available
+2. Use LLM for extraction if available
+3. Fall back to regex patterns if LLM is unavailable
+
+The modal UI will also be enhanced to show:
+- LLM confidence badges
+- Disambiguation options when entities are ambiguous
+- Alternative predicate suggestions
+- Claim improvement suggestions

@@ -264,7 +264,7 @@ export class IntuitionService extends BaseService {
 
 		// Create deterministic cache key to ensure identical queries hit the cache
 		// regardless of property order in the filters object
-		const cacheKey = createDeterministicCacheKey('search:', filters);
+		const cacheKey = createDeterministicCacheKey('search:', filters as Record<string, unknown>);
 
 		// Check cache
 		const cached = this.cacheService.get<AtomData[]>(cacheKey);
