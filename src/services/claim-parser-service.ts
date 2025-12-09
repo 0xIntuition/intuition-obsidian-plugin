@@ -18,16 +18,24 @@ export class ClaimParserService extends BaseService {
 		super(plugin);
 	}
 
+	/**
+	 * Initialize the service and setup extraction patterns
+	 */
 	async initialize(): Promise<void> {
 		this.patterns = this.initializePatterns();
 	}
 
+	/**
+	 * Cleanup service resources (stateless service, no cleanup needed)
+	 */
 	cleanup(): void {
 		// Stateless service, nothing to clean up
 	}
 
 	/**
 	 * Parse text and extract a triple structure
+	 * @param text - The text to parse into a triple
+	 * @returns A triple suggestion with confidence score, or null if no pattern matches
 	 */
 	parseText(text: string): TripleSuggestion | null {
 		// Clean the text
@@ -55,6 +63,8 @@ export class ClaimParserService extends BaseService {
 
 	/**
 	 * Validate if text is suitable for a claim
+	 * @param text - The text to validate
+	 * @returns Validation result with errors and warnings
 	 */
 	validateClaim(text: string): ClaimValidation {
 		const errors: string[] = [];
@@ -221,6 +231,8 @@ export class ClaimParserService extends BaseService {
 				pattern: pattern.name,
 			};
 		} catch (error) {
+			// Unexpected error during extraction - log for debugging
+			console.error('Error extracting triple from match:', error);
 			return null;
 		}
 	}

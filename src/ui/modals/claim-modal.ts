@@ -14,6 +14,8 @@ import {
 } from '../../types';
 
 export class ClaimModal extends Modal {
+	private static readonly MIN_AUTO_SUGGESTION_CONFIDENCE = 0.5;
+
 	private plugin: IntuitionPlugin;
 	private selectedText: string;
 
@@ -321,7 +323,11 @@ export class ClaimModal extends Modal {
 
 		// Stats
 		const stats = this.consensusEl.createDiv({ cls: 'consensus-stats' });
-		const totalAssets = forAssets + againstAssets;
+		// Handle BigInt addition properly
+		const totalAssets =
+			typeof forAssets === 'bigint' && typeof againstAssets === 'bigint'
+				? forAssets + againstAssets
+				: BigInt(forAssets) + BigInt(againstAssets);
 		const totalStaked = (Number(totalAssets) / 1e18).toFixed(4);
 		stats.createSpan({ text: `Total staked: ${totalStaked} TRUST` });
 	}
@@ -485,8 +491,8 @@ export class ClaimModal extends Modal {
 			this.plugin.noticeManager.error(
 				'Failed to check claim existence'
 			);
-			this.draft.status = ClaimStatus.INVALID;
-			this.draft.errors.push('Network error checking claim');
+			// Keep status as DRAFT to allow retry, don't mark as INVALID
+			this.draft.status = ClaimStatus.DRAFT;
 		}
 
 		this.renderStatus();
@@ -524,7 +530,10 @@ export class ClaimModal extends Modal {
 		const suggestion =
 			this.plugin.claimParserService.parseText(this.selectedText);
 
-		if (!suggestion || suggestion.confidence < 0.5) {
+		if (
+			!suggestion ||
+			suggestion.confidence < ClaimModal.MIN_AUTO_SUGGESTION_CONFIDENCE
+		) {
 			return;
 		}
 
@@ -547,9 +556,6 @@ export class ClaimModal extends Modal {
 		this.plugin.noticeManager.info(
 			'Stake flow coming in Plan 007'
 		);
-
-		// Log draft for debugging
-		console.log('Claim draft:', this.draft);
 
 		// Close modal
 		// this.close();
