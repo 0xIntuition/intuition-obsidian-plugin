@@ -15,16 +15,17 @@ export function formatTimestamp(timestamp: number): string {
  * @param saved - User's saved settings (may be partial/corrupted)
  * @returns Merged settings with all required properties
  */
-export function deepMergeSettings<T extends Record<string, unknown>>(
+export function deepMergeSettings<T>(
 	defaults: T,
-	saved: Partial<T>
+	saved: Partial<T> | Record<string, unknown>
 ): T {
-	const result = { ...defaults };
+	const result = { ...defaults } as T;
+	const savedRecord = saved as Record<string, unknown>;
 
 	for (const key in saved) {
 		if (saved.hasOwnProperty(key)) {
-			const savedValue = saved[key];
-			const defaultValue = defaults[key];
+			const savedValue = savedRecord[key];
+			const defaultValue = (defaults as Record<string, unknown>)[key];
 
 			// If both are objects (and not null), merge recursively
 			if (
@@ -35,10 +36,13 @@ export function deepMergeSettings<T extends Record<string, unknown>>(
 				!Array.isArray(savedValue) &&
 				!Array.isArray(defaultValue)
 			) {
-				result[key] = deepMergeSettings(defaultValue, savedValue) as T[Extract<keyof T, string>];
+				(result as Record<string, unknown>)[key] = deepMergeSettings(
+					defaultValue as Record<string, unknown>,
+					savedValue as Record<string, unknown>
+				);
 			} else {
 				// Primitive or null - use saved value
-				result[key] = savedValue as T[Extract<keyof T, string>];
+				(result as Record<string, unknown>)[key] = savedValue;
 			}
 		}
 	}
@@ -74,12 +78,15 @@ export function truncateAddress(address: string, length = 6): string {
  * createDeterministicCacheKey("search:", { label: "test", type: "Thing", creatorId: "0x123" })
  * createDeterministicCacheKey("search:", { type: "Thing", creatorId: "0x123", label: "test" })
  */
-export function createDeterministicCacheKey<T extends Record<string, unknown>>(
+export function createDeterministicCacheKey(
 	prefix: string,
-	obj: T
+	obj: Record<string, unknown>
 ): string {
+	// Cast to Record<string, unknown> to allow working with any object type
+	const record = obj as Record<string, unknown>;
+
 	// Filter out undefined values
-	const defined = Object.entries(obj).filter(([_, value]) => value !== undefined);
+	const defined = Object.entries(record).filter(([_, value]) => value !== undefined);
 
 	// Sort by key name for deterministic ordering
 	const sorted = defined.sort(([a], [b]) => a.localeCompare(b));
@@ -106,7 +113,7 @@ export function createDeterministicCacheKey<T extends Record<string, unknown>>(
  */
 export function isValidImageUrl(
 	url: string | undefined | null
-): boolean {
+): url is string {
 	if (!url || typeof url !== 'string') {
 		return false;
 	}
