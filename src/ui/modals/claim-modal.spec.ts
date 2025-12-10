@@ -953,30 +953,4 @@ describe('ClaimModal - Predicate Alternatives', () => {
 		const pills = modal.contentEl.querySelectorAll('.predicate-pill');
 		expect(pills.length).toBe(0);
 	});
-
-	it('should store currentSuggestion when rendering LLM metadata', () => {
-		modal.onOpen();
-
-		const suggestion = {
-			subject: 'Bitcoin',
-			predicate: 'is',
-			object: 'cryptocurrency',
-			confidence: 0.9,
-			pattern: 'llm' as const,
-			llmMetadata: {
-				predicateAlternatives: ['represents'],
-				subjectType: 'concept' as const,
-				objectType: 'concept' as const,
-				subjectConfidence: 0.9,
-				objectConfidence: 0.9,
-			},
-		};
-
-		// Verify currentSuggestion is set by checking internal state
-		// We don't need to call renderLLMMetadata directly - just verify the property storage
-		(modal as any).currentSuggestion = suggestion;
-
-		expect((modal as any).currentSuggestion).toBe(suggestion);
-		expect((modal as any).currentSuggestion.llmMetadata?.predicateAlternatives).toEqual(['represents']);
-	});
 });

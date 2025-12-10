@@ -39,8 +39,6 @@ export class ClaimModal extends Modal {
 
 	// LLM-related
 	private llmMetadataEl: HTMLElement | null = null;
-	// Track current suggestion for predicate alternatives
-	private currentSuggestion: TripleSuggestion | null = null;
 
 	// Loading state
 	private isExtracting = false;
@@ -903,9 +901,6 @@ export class ClaimModal extends Modal {
 	 */
 	private renderLLMMetadata(suggestion: TripleSuggestion): void {
 		if (!suggestion.llmMetadata) return;
-
-		// Store suggestion for later use
-		this.currentSuggestion = suggestion;
 
 		const metadata = suggestion.llmMetadata;
 
