@@ -17,6 +17,7 @@ import {
 
 export class ClaimModal extends Modal {
 	private static readonly MIN_AUTO_SUGGESTION_CONFIDENCE = 0.5;
+	private static readonly EXTRACTION_TIMEOUT_MS = 10000;
 
 	private plugin: IntuitionPlugin;
 	private selectedText: string;
@@ -560,19 +561,22 @@ export class ClaimModal extends Modal {
 			this.loadingIndicatorEl.remove();
 		}
 
-		// Create loading section WITHOUT adding to DOM yet
-		const tempDiv = document.createElement('div');
-		tempDiv.className = 'claim-extraction-loading';
+		// Insert loading indicator after original text
+		const loadingDiv = document.createElement('div');
+		loadingDiv.className = 'claim-extraction-loading';
 
-		// Insert after originalTextEl
 		this.loadingIndicatorEl = this.originalTextEl.insertAdjacentElement(
 			'afterend',
-			tempDiv
+			loadingDiv
 		) as HTMLElement;
 
 		// Now add content to the positioned element
 		this.loadingIndicatorEl.createSpan({
 			cls: 'loading-spinner',
+			attr: {
+				role: 'status',
+				'aria-label': 'Loading',
+			},
 		});
 
 		const text =
@@ -583,6 +587,9 @@ export class ClaimModal extends Modal {
 		this.loadingIndicatorEl.createSpan({
 			text: text,
 			cls: 'loading-text',
+			attr: {
+				'aria-live': 'polite',
+			},
 		});
 	}
 
@@ -628,7 +635,7 @@ export class ClaimModal extends Modal {
 			this.plugin.noticeManager.warning(
 				'Extraction is taking longer than expected'
 			);
-		}, 10000); // 10 second timeout
+		}, ClaimModal.EXTRACTION_TIMEOUT_MS);
 
 		try {
 			const suggestion =

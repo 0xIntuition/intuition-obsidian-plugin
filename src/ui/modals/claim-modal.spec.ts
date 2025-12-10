@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ClaimModal } from './claim-modal';
 import { createTestPlugin } from '../../../tests/fixtures/plugin';
 import { createTimeController } from '../../../tests/helpers/test-plugin';
+import { flushPromises } from '../../../tests/helpers/async-utils';
 import type IntuitionPlugin from '../../main';
 
 describe('ClaimModal - Loading States', () => {
@@ -33,15 +34,19 @@ describe('ClaimModal - Loading States', () => {
 			isAvailable: vi.fn(() => true),
 		} as any;
 
-		// Mock the claim parser service
+		// Mock the claim parser service with slight delay to allow loading indicator to appear
 		plugin.claimParserService = {
-			extractTriple: vi.fn(async () => ({
-				subject: 'Test Subject',
-				predicate: 'test-predicate',
-				object: 'Test Object',
-				confidence: 0.85,
-				pattern: 'llm',
-			})),
+			extractTriple: vi.fn(async () => {
+				// Add small delay to allow loading indicator to render
+				await new Promise(resolve => setTimeout(resolve, 50));
+				return {
+					subject: 'Test Subject',
+					predicate: 'test-predicate',
+					object: 'Test Object',
+					confidence: 0.85,
+					pattern: 'llm',
+				};
+			}),
 			validateClaim: vi.fn(() => ({ warnings: [] })),
 		} as any;
 
@@ -75,6 +80,7 @@ describe('ClaimModal - Loading States', () => {
 	describe('Loading Indicator Display', () => {
 		it('should show loading indicator when LLM is enabled', async () => {
 			modal.onOpen();
+			await flushPromises();
 
 			// Wait for loading indicator to appear
 			await vi.waitFor(
@@ -93,6 +99,7 @@ describe('ClaimModal - Loading States', () => {
 			plugin.settings.llm.enabled = false;
 
 			modal.onOpen();
+			await flushPromises();
 
 			await vi.waitFor(
 				() => {
@@ -110,6 +117,7 @@ describe('ClaimModal - Loading States', () => {
 			plugin.llmService.isAvailable = vi.fn(() => false);
 
 			modal.onOpen();
+			await flushPromises();
 
 			await vi.waitFor(
 				() => {
@@ -125,6 +133,7 @@ describe('ClaimModal - Loading States', () => {
 
 		it('should display spinner element', async () => {
 			modal.onOpen();
+			await flushPromises();
 
 			await vi.waitFor(
 				() => {
@@ -137,6 +146,7 @@ describe('ClaimModal - Loading States', () => {
 
 		it('should display loading text element', async () => {
 			modal.onOpen();
+			await flushPromises();
 
 			await vi.waitFor(
 				() => {
@@ -149,6 +159,7 @@ describe('ClaimModal - Loading States', () => {
 
 		it('should insert loading indicator after original text', async () => {
 			modal.onOpen();
+			await flushPromises();
 
 			// Wait for loading indicator to appear and verify position
 			await vi.waitFor(
@@ -174,6 +185,7 @@ describe('ClaimModal - Loading States', () => {
 	describe('Loading Indicator Removal', () => {
 		it('should hide loading indicator after extraction completes', async () => {
 			modal.onOpen();
+			await flushPromises();
 
 			// Wait for extraction to complete by waiting for the promise
 			await vi.waitFor(
@@ -232,6 +244,7 @@ describe('ClaimModal - Loading States', () => {
 			});
 
 			modal.onOpen();
+			await flushPromises();
 
 			// Wait for error handling
 			await vi.waitFor(
@@ -256,6 +269,7 @@ describe('ClaimModal - Loading States', () => {
 			}));
 
 			modal.onOpen();
+			await flushPromises();
 
 			// Wait for extraction
 			await vi.waitFor(
@@ -313,6 +327,7 @@ describe('ClaimModal - Loading States', () => {
 	describe('User Interaction During Loading', () => {
 		it('should allow fields to remain editable during loading', async () => {
 			modal.onOpen();
+			await flushPromises();
 
 			// Wait for loading indicator and verify fields
 			await vi.waitFor(
@@ -341,6 +356,7 @@ describe('ClaimModal - Loading States', () => {
 	describe('Extraction Completion Flow', () => {
 		it('should show notice after successful extraction', async () => {
 			modal.onOpen();
+			await flushPromises();
 
 			// Wait for extraction to complete
 			await vi.waitFor(
@@ -373,6 +389,7 @@ describe('ClaimModal - Loading States', () => {
 			});
 
 			modal.onOpen();
+			await flushPromises();
 
 			await vi.waitFor(() => {
 				return plugin.noticeManager.info.mock.calls.length > 0;
@@ -393,6 +410,7 @@ describe('ClaimModal - Loading States', () => {
 			}));
 
 			modal.onOpen();
+			await flushPromises();
 
 			await vi.waitFor(
 				() => {
@@ -414,6 +432,7 @@ describe('ClaimModal - Loading States', () => {
 			);
 
 			modal.onOpen();
+			await flushPromises();
 
 			await vi.waitFor(
 				() => {
@@ -435,6 +454,7 @@ describe('ClaimModal - Loading States', () => {
 			);
 
 			modal.onOpen();
+			await flushPromises();
 
 			await vi.waitFor(
 				() => {
@@ -449,6 +469,7 @@ describe('ClaimModal - Loading States', () => {
 
 		it('should not show duplicate loading indicators on re-render', async () => {
 			modal.onOpen();
+			await flushPromises();
 
 			// Wait for loading indicator and verify only one exists
 			await vi.waitFor(
