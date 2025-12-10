@@ -12,11 +12,9 @@ describe('createObsidianFetch', () => {
 
 	beforeEach(() => {
 		mockRequestUrl = vi.fn();
-		mockPlugin = {
-			app: {
-				requestUrl: mockRequestUrl,
-			},
-		} as unknown as IntuitionPlugin;
+		// Mock window.requestUrl instead of plugin.app.requestUrl
+		(window as any).requestUrl = mockRequestUrl;
+		mockPlugin = {} as unknown as IntuitionPlugin;
 	});
 
 	describe('Request Parsing', () => {

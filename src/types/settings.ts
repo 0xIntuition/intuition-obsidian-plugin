@@ -117,7 +117,7 @@ export interface IntuitionPluginSettings {
 export const DEFAULT_LLM_SETTINGS: LLMSettings = {
   enabled: false,
   provider: 'anthropic',
-  modelId: 'claude-haiku-3-5-20241022',
+  modelId: 'claude-3-5-haiku-20241022',
   encryptedApiKey: null,
   encryptionSalt: null,
   customBaseUrl: null,
