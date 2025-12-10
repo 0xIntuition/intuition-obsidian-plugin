@@ -484,3 +484,243 @@ describe('ClaimModal - Loading States', () => {
 		});
 	});
 });
+
+describe('ClaimModal - Apply Suggestion', () => {
+	let modal: ClaimModal;
+	let plugin: IntuitionPlugin;
+
+	beforeEach(() => {
+		const { plugin: testPlugin, app } = createTestPlugin({
+			llm: {
+				enabled: true,
+				provider: 'anthropic',
+				encryptedApiKey: 'test-key',
+			},
+		});
+		plugin = testPlugin as unknown as IntuitionPlugin;
+
+		// Initialize settings properly
+		plugin.settings = {
+			llm: {
+				enabled: true,
+				provider: 'anthropic',
+				encryptedApiKey: 'test-key',
+			},
+		} as any;
+
+		// Mock the LLM service
+		plugin.llmService = {
+			isAvailable: vi.fn(() => true),
+			extractClaims: vi.fn(async (text: string) => [{
+				subject: { text: 'Albert Einstein', type: 'Person' },
+				predicate: { text: 'created', type: 'Relationship' },
+				object: { text: 'general relativity', type: 'Concept' },
+				confidence: 0.9,
+			}]),
+		} as any;
+
+		// Mock the claim parser service
+		plugin.claimParserService = {
+			extractTriple: vi.fn(async () => null),
+			validateClaim: vi.fn(() => ({ warnings: [] })),
+		} as any;
+
+		// Mock the notice manager
+		plugin.noticeManager = {
+			info: vi.fn(),
+			warning: vi.fn(),
+			error: vi.fn(),
+			success: vi.fn(),
+		} as any;
+
+		// Mock the intuition service
+		plugin.intuitionService = {
+			searchAtoms: vi.fn(async () => []),
+			semanticSearchAtoms: vi.fn(async () => []),
+		} as any;
+
+		modal = new ClaimModal(
+			app,
+			plugin,
+			'Einstein made relativity',
+			'/test/file.md'
+		);
+	});
+
+	afterEach(() => {
+		modal.close();
+	});
+
+	describe('Regex Parsing', () => {
+		it('should parse simple suggestions with "created" predicate', () => {
+			const result = (modal as any).parseSuggestionRegex(
+				'Albert Einstein created the theory of relativity',
+				'created'
+			);
+
+			expect(result).toEqual({
+				subject: 'Albert Einstein',
+				predicate: 'created',
+				object: 'the theory of relativity'
+			});
+		});
+
+		it('should parse "is a" predicates when passed as original predicate', () => {
+			const result = (modal as any).parseSuggestionRegex(
+				'Bitcoin is a cryptocurrency',
+				'is a'
+			);
+
+			expect(result).toEqual({
+				subject: 'Bitcoin',
+				predicate: 'is a',
+				object: 'cryptocurrency'
+			});
+		});
+
+		it('should parse "is" predicates', () => {
+			const result = (modal as any).parseSuggestionRegex(
+				'Gold is valuable',
+				'is'
+			);
+
+			expect(result).toEqual({
+				subject: 'Gold',
+				predicate: 'is',
+				object: 'valuable'
+			});
+		});
+
+		it('should parse "has" predicates', () => {
+			const result = (modal as any).parseSuggestionRegex(
+				'Bitcoin has blockchain technology',
+				'has'
+			);
+
+			expect(result).toEqual({
+				subject: 'Bitcoin',
+				predicate: 'has',
+				object: 'blockchain technology'
+			});
+		});
+
+		it('should return null for truly unparseable suggestions', () => {
+			const result = (modal as any).parseSuggestionRegex(
+				'Random text without structure',
+				'nonexistent'
+			);
+
+			expect(result).toBeNull();
+		});
+
+		it('should handle case-insensitive matching', () => {
+			const result = (modal as any).parseSuggestionRegex(
+				'SpaceX LAUNCHED Starship',
+				'launched'
+			);
+
+			expect(result).toEqual({
+				subject: 'SpaceX',
+				predicate: 'launched',
+				object: 'Starship'
+			});
+		});
+
+		it('should try original predicate first', () => {
+			const result = (modal as any).parseSuggestionRegex(
+				'Company developed product',
+				'developed'
+			);
+
+			expect(result).toEqual({
+				subject: 'Company',
+				predicate: 'developed',
+				object: 'product'
+			});
+		});
+	});
+
+	describe('Hybrid Parsing', () => {
+		it('should use regex parsing when it succeeds', async () => {
+			const result = await (modal as any).parseSuggestion(
+				'Albert Einstein created general relativity',
+				'created'
+			);
+
+			expect(result).toEqual({
+				subject: 'Albert Einstein',
+				predicate: 'created',
+				object: 'general relativity'
+			});
+
+			// LLM should not be called
+			expect(plugin.llmService.extractClaims).not.toHaveBeenCalled();
+		});
+
+		it('should fallback to LLM when regex fails', async () => {
+			const result = await (modal as any).parseSuggestion(
+				'Complex relationship between A and B',
+				'unknown'
+			);
+
+			expect(result).toEqual({
+				subject: 'Albert Einstein',
+				predicate: 'created',
+				object: 'general relativity'
+			});
+
+			// LLM should be called
+			expect(plugin.llmService.extractClaims).toHaveBeenCalledWith(
+				'Complex relationship between A and B'
+			);
+		});
+
+		it('should return null when both regex and LLM fail', async () => {
+			plugin.llmService.extractClaims = vi.fn(async () => []);
+
+			const result = await (modal as any).parseSuggestion(
+				'Unparseable text',
+				'unknown'
+			);
+
+			expect(result).toBeNull();
+		});
+
+		it('should return null when LLM is disabled and regex fails', async () => {
+			plugin.settings.llm.enabled = false;
+
+			const result = await (modal as any).parseSuggestion(
+				'Unparseable text',
+				'unknown'
+			);
+
+			expect(result).toBeNull();
+			expect(plugin.llmService.extractClaims).not.toHaveBeenCalled();
+		});
+
+		it('should return null when LLM is not available and regex fails', async () => {
+			plugin.llmService.isAvailable = vi.fn(() => false);
+
+			const result = await (modal as any).parseSuggestion(
+				'Unparseable text',
+				'unknown'
+			);
+
+			expect(result).toBeNull();
+			expect(plugin.llmService.extractClaims).not.toHaveBeenCalled();
+		});
+
+		it('should handle LLM extraction errors gracefully', async () => {
+			plugin.llmService.extractClaims = vi.fn(async () => {
+				throw new Error('LLM API error');
+			});
+
+			const result = await (modal as any).parseSuggestion(
+				'Unparseable text',
+				'unknown'
+			);
+
+			expect(result).toBeNull();
+		});
+	});
+});
