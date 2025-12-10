@@ -95,6 +95,43 @@ The plugin supports **testnet** and **mainnet**:
 - All caches are cleared on network switch to prevent stale data
 - Settings auto-repair if network config is invalid
 
+### LLM CORS Fix
+
+**Problem**: Browser-based CORS restrictions prevent direct fetch calls to LLM provider APIs (Anthropic, OpenAI, etc.) from Obsidian's Electron sandbox.
+
+**Solution**: Use Obsidian's `requestUrl()` API which bypasses CORS by making requests from the Electron main process instead of the renderer process.
+
+**Implementation**:
+- `src/utils/obsidian-fetch.ts` - Fetch-compatible wrapper around Obsidian's `requestUrl()`
+- Passed to all AI SDK provider clients via `fetch` configuration option
+- Transparently handles request/response format conversion between fetch API and Obsidian's format
+
+**Limitations**:
+- **No streaming**: Responses are fully buffered (not a problem for `generateObject()` which expects complete responses)
+- **No FormData**: Not needed for LLM APIs which exclusively use JSON
+- **ReadableStream buffering**: Stream request bodies are buffered before sending (rarely needed for LLM requests)
+
+**Usage Example**:
+```typescript
+// In LLMService.createClient()
+const customFetch = createObsidianFetch(this.plugin);
+
+const client = createAnthropic({
+  apiKey: this.decryptedApiKey,
+  fetch: customFetch,  // Uses Obsidian's requestUrl instead of fetch
+});
+```
+
+**Testing**:
+- Unit tests: `src/utils/obsidian-fetch.spec.ts` - Mock requestUrl and verify request/response mapping
+- Integration tests: `tests/integration/llm-cors.integration.spec.ts` - Real API calls to verify CORS bypass works
+
+**Troubleshooting**:
+- Check Developer Console for fetch/network errors
+- Verify API key is valid and unlocked in LLM settings
+- Ensure HTTPS endpoints (HTTP blocked in production except localhost)
+- Check that `requestUrl` is being called (not standard fetch) by monitoring network requests
+
 ### Wallet Security Model
 
 **CRITICAL SECURITY WARNINGS:**

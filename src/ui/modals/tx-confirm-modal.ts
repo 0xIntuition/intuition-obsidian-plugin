@@ -21,7 +21,7 @@ export class TxConfirmModal extends Modal {
 	private stakeConfig: StakeConfig;
 	private plan: TransactionPlan;
 
-	private isExecuting: boolean = false;
+	private isExecuting = false;
 	private stepsEl: HTMLElement;
 	private executeButton: HTMLButtonElement;
 
