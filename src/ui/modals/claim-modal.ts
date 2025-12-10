@@ -39,8 +39,7 @@ export class ClaimModal extends Modal {
 
 	// LLM-related
 	private llmMetadataEl: HTMLElement | null = null;
-	// Track current suggestion for potential future use (e.g., re-rendering on changes)
-	// @ts-expect-error - Used for storing suggestion metadata for predicate alternatives
+	// Track current suggestion for predicate alternatives
 	private currentSuggestion: TripleSuggestion | null = null;
 
 	// Loading state

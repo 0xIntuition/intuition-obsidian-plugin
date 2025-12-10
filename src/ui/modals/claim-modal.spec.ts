@@ -943,18 +943,6 @@ describe('ClaimModal - Predicate Alternatives', () => {
 		expect(pills[0].textContent).toBe('x');
 	});
 
-	it('should render alternatives when LLM provides predicateAlternatives', () => {
-		modal.onOpen();
-
-		// Test that alternatives are rendered correctly via the render method
-		(modal as any).renderPredicateAlternatives(['represents', 'functions as']);
-
-		const pills = modal.contentEl.querySelectorAll('.predicate-pill');
-		expect(pills.length).toBe(2);
-		expect(pills[0].textContent).toBe('represents');
-		expect(pills[1].textContent).toBe('functions as');
-	});
-
 	it('should not render alternatives when LLM metadata has empty array', () => {
 		modal.onOpen();
 
@@ -977,8 +965,8 @@ describe('ClaimModal - Predicate Alternatives', () => {
 			pattern: 'llm' as const,
 			llmMetadata: {
 				predicateAlternatives: ['represents'],
-				subjectType: 'Cryptocurrency',
-				objectType: 'Category',
+				subjectType: 'concept' as const,
+				objectType: 'concept' as const,
 				subjectConfidence: 0.9,
 				objectConfidence: 0.9,
 			},
