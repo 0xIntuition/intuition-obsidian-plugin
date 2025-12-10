@@ -52,16 +52,16 @@ export const LLM_PROVIDERS: Record<LLMProvider, LLMProviderConfig> = {
 		name: 'Anthropic',
 		models: [
 			{
-				id: 'claude-haiku-3-5-20241022',
-				name: 'Claude Haiku 3.5',
+				id: 'claude-3-5-haiku-20241022',
+				name: 'Claude 3.5 Haiku',
 				contextWindow: 200000,
 				inputPricePerMillion: 0.8,
 				outputPricePerMillion: 4,
 				recommended: true,
 			},
 			{
-				id: 'claude-sonnet-4-20250514',
-				name: 'Claude Sonnet 4',
+				id: 'claude-3-5-sonnet-20241022',
+				name: 'Claude 3.5 Sonnet',
 				contextWindow: 200000,
 				inputPricePerMillion: 3,
 				outputPricePerMillion: 15,

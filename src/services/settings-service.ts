@@ -52,6 +52,19 @@ export class SettingsService extends BaseService {
       hadErrors = true;
     }
 
+    // Migrate old Anthropic model IDs to new format
+    if (repaired.llm.provider === 'anthropic') {
+      const modelIdMigrations: Record<string, string> = {
+        'claude-haiku-3-5-20241022': 'claude-3-5-haiku-20241022',
+        'claude-sonnet-4-20250514': 'claude-3-5-sonnet-20241022',
+      };
+
+      if (modelIdMigrations[repaired.llm.modelId]) {
+        repaired.llm.modelId = modelIdMigrations[repaired.llm.modelId];
+        hadErrors = true;
+      }
+    }
+
     // Validate cache TTLs
     ['atomTTL', 'vaultTTL', 'searchTTL'].forEach((key) => {
       if (!this.validateCacheTTL(repaired.cache[key as keyof typeof repaired.cache] as number).valid) {

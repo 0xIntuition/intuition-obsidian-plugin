@@ -514,3 +514,259 @@
 	color: var(--text-muted);
 	font-style: italic;
 }
+
+/* ===================================
+   Stake Modal Styles
+   =================================== */
+
+.intuition-stake-modal {
+	max-width: 500px;
+}
+
+.claim-summary {
+	background: var(--background-secondary);
+	padding: 12px;
+	border-radius: 4px;
+	margin-bottom: 16px;
+}
+
+.claim-summary .triple-display {
+	font-family: monospace;
+	font-size: 13px;
+	margin: 0 0 8px 0;
+	color: var(--text-normal);
+}
+
+.claim-summary small {
+	color: var(--text-muted);
+	font-size: 12px;
+}
+
+.stake-input-section {
+	margin: 16px 0;
+}
+
+.impact-section,
+.plan-section {
+	margin: 16px 0;
+}
+
+.impact-section h4,
+.plan-section h4 {
+	margin: 0 0 12px 0;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.impact-grid {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.impact-row {
+	display: flex;
+	justify-content: space-between;
+	padding: 4px 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+	font-size: 13px;
+}
+
+.impact-row span:first-child {
+	color: var(--text-muted);
+}
+
+.impact-row span:last-child {
+	color: var(--text-normal);
+	font-weight: 500;
+}
+
+.impact-row .positive {
+	color: var(--text-success);
+}
+
+.impact-row .negative {
+	color: var(--text-error);
+}
+
+.plan-steps {
+	padding-left: 20px;
+	margin: 8px 0;
+	font-size: 13px;
+}
+
+.plan-steps li {
+	margin: 4px 0;
+	color: var(--text-normal);
+}
+
+.total-cost {
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 2px solid var(--background-modifier-border);
+	font-weight: 500;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.total-cost .cost-amount {
+	font-size: 16px;
+	color: var(--text-accent);
+}
+
+.stake-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 20px;
+}
+
+/* ===================================
+   Transaction Confirm Modal Styles
+   =================================== */
+
+.intuition-tx-confirm-modal {
+	max-width: 600px;
+}
+
+.tx-confirm-warning {
+	margin: 16px 0;
+	padding: 12px;
+	background: rgba(234, 179, 8, 0.1);
+	border-left: 3px solid var(--text-warning);
+	border-radius: 4px;
+}
+
+.tx-confirm-warning p {
+	margin: 0;
+	font-size: 13px;
+	color: var(--text-normal);
+}
+
+.tx-steps {
+	margin: 16px 0;
+}
+
+.tx-steps h4 {
+	margin: 0 0 12px 0;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.tx-steps-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.tx-step {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	padding: 12px;
+	background: var(--background-secondary);
+	border-radius: 4px;
+	border-left: 3px solid transparent;
+}
+
+.tx-step.status-pending {
+	border-left-color: var(--text-muted);
+}
+
+.tx-step.status-signing {
+	border-left-color: var(--text-accent);
+}
+
+.tx-step.status-confirming {
+	border-left-color: var(--text-accent);
+	animation: pulse 1.5s ease-in-out infinite;
+}
+
+.tx-step.status-confirmed {
+	border-left-color: var(--text-success);
+}
+
+.tx-step.status-failed {
+	border-left-color: var(--text-error);
+	background: rgba(239, 68, 68, 0.05);
+}
+
+.tx-step-icon {
+	width: 24px;
+	text-align: center;
+	font-size: 18px;
+	flex-shrink: 0;
+}
+
+.tx-step-description {
+	flex: 1;
+	font-size: 13px;
+	color: var(--text-normal);
+}
+
+.tx-step-hash {
+	display: block;
+	margin-top: 4px;
+	font-family: monospace;
+	font-size: 11px;
+	color: var(--text-accent);
+	text-decoration: none;
+}
+
+.tx-step-hash:hover {
+	text-decoration: underline;
+}
+
+.tx-step-error {
+	margin-top: 8px;
+	padding: 8px;
+	background: rgba(239, 68, 68, 0.1);
+	border-radius: 4px;
+	font-size: 12px;
+	color: var(--text-error);
+}
+
+.tx-cost-section {
+	margin: 16px 0;
+}
+
+.tx-cost-section h4 {
+	margin: 0 0 8px 0;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.tx-total-cost {
+	padding: 12px;
+	background: var(--background-secondary);
+	border-radius: 4px;
+	font-size: 14px;
+	font-weight: 500;
+}
+
+.tx-total-cost .cost-amount {
+	font-size: 16px;
+	color: var(--text-accent);
+	margin-left: 8px;
+}
+
+.tx-confirm-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 20px;
+}
+
+/* Animations */
+@keyframes pulse {
+	0%, 100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.5;
+	}
+}

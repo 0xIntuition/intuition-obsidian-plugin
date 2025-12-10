@@ -21,6 +21,8 @@ import {
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
+// Obsidian fetch adapter for CORS fix
+import { createObsidianFetch } from '../utils/obsidian-fetch';
 
 export class LLMService extends BaseService {
 	private cryptoService: CryptoService;
@@ -230,29 +232,36 @@ export class LLMService extends BaseService {
 			}
 		}
 
+		// Create custom fetch wrapper to bypass CORS restrictions
+		// This uses Obsidian's requestUrl() instead of standard fetch()
+		const customFetch = createObsidianFetch(this.plugin);
 
 		try {
 			switch (provider) {
 				case 'anthropic':
 					this.llmClient = createAnthropic({
 						apiKey: this.decryptedApiKey,
+						fetch: customFetch,
 					});
 					break;
 				case 'openai':
 					this.llmClient = createOpenAI({
 						apiKey: this.decryptedApiKey,
 						baseURL: customBaseUrl || undefined,
+						fetch: customFetch,
 					});
 					break;
 				case 'openrouter':
 					this.llmClient = createOpenAI({
 						apiKey: this.decryptedApiKey,
 						baseURL: 'https://openrouter.ai/api/v1',
+						fetch: customFetch,
 					});
 					break;
 				case 'google':
 					this.llmClient = createGoogleGenerativeAI({
 						apiKey: this.decryptedApiKey,
+						fetch: customFetch,
 					});
 					break;
 				default:
@@ -615,6 +624,12 @@ export class LLMService extends BaseService {
 		text: string,
 		context?: string
 	): Promise<import('../types/llm').ExtractedClaimLLM[]> {
+		console.debug('[LLM Service] extractClaims called:', {
+			textLength: text.length,
+			hasContext: !!context,
+			isAvailable: this.isAvailable(),
+		});
+
 		if (!this.isAvailable()) {
 			throw new PluginError(
 				LLM_ERRORS.NO_API_KEY,
@@ -638,6 +653,8 @@ export class LLMService extends BaseService {
 		const expectedOutputTokens = 400;
 		const estimate = this.estimateCost(sanitized, expectedOutputTokens);
 
+		console.debug('[LLM Service] Cost estimate:', estimate);
+
 		// Check budget
 		const budgetCheck = this.checkBudget(estimate.estimatedCostUSD);
 		if (!budgetCheck.valid) {
@@ -655,6 +672,8 @@ export class LLMService extends BaseService {
 					sanitized,
 					context
 				);
+				console.debug('[LLM Service] Prompt built, calling LLM...');
+
 				const result = await this.callLLM(prompt);
 
 				// Track usage
@@ -665,9 +684,15 @@ export class LLMService extends BaseService {
 					usage.completionTokens
 				);
 
+				console.debug('[LLM Service] Claims extracted successfully:', result.object.claims.length);
 				return result.object.claims;
 			} catch (error) {
-				console.error('LLM claim extraction failed:', error);
+				console.error('[LLM Service] LLM claim extraction failed:', {
+					error,
+					errorType: error?.constructor?.name,
+					errorMessage: error instanceof Error ? error.message : String(error),
+					stack: error instanceof Error ? error.stack : undefined,
+				});
 				return []; // Return empty array to trigger fallback
 			}
 		});
@@ -718,6 +743,16 @@ Return all valid claims found in the text.`;
 
 		const provider = this.plugin.settings.llm.provider;
 		const modelId = this.plugin.settings.llm.modelId;
+		const customBaseUrl = this.plugin.settings.llm.customBaseUrl;
+
+		console.debug('[LLM Service] Calling LLM:', {
+			provider,
+			modelId,
+			customBaseUrl,
+			promptLength: prompt.length,
+			hasClient: !!this.llmClient,
+			hasApiKey: !!this.decryptedApiKey,
+		});
 
 		// Get model function based on provider
 		let model;
@@ -740,11 +775,30 @@ Return all valid claims found in the text.`;
 				);
 		}
 
-		return await generateObject({
-			model,
-			schema: ClaimExtractionSchema,
-			prompt,
-		});
+		console.debug('[LLM Service] Model created, calling generateObject...');
+
+		try {
+			const result = await generateObject({
+				model,
+				schema: ClaimExtractionSchema,
+				prompt,
+			});
+
+			console.debug('[LLM Service] Response received:', {
+				claimsCount: result.object?.claims?.length || 0,
+				usage: result.usage,
+			});
+
+			return result;
+		} catch (error) {
+			console.error('[LLM Service] generateObject failed:', {
+				error,
+				errorType: error?.constructor?.name,
+				errorMessage: error instanceof Error ? error.message : String(error),
+				stack: error instanceof Error ? error.stack : undefined,
+			});
+			throw error;
+		}
 	}
 
 }

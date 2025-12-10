@@ -8,4 +8,6 @@ export * from './networks';
 export * from './plugin';
 export * from './search';
 export * from './settings';
+export * from './staking';
+export * from './transactions';
 export * from './wallet';
