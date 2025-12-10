@@ -39,6 +39,10 @@ export class ClaimModal extends Modal {
 	// LLM-related
 	private llmMetadataEl: HTMLElement | null = null;
 
+	// Loading state
+	private extractionTimeout: NodeJS.Timeout | null = null;
+	private loadingIndicatorEl: HTMLElement | null = null;
+
 	constructor(
 		app: App,
 		plugin: IntuitionPlugin,
@@ -107,6 +111,9 @@ export class ClaimModal extends Modal {
 	onClose() {
 		const { contentEl } = this;
 		contentEl.empty();
+
+		// Clear loading indicator
+		this.hideLoadingIndicator();
 
 		// Cleanup search components
 		if (this.subjectSearch) {
@@ -544,14 +551,77 @@ export class ClaimModal extends Modal {
 	}
 
 	/**
+	 * Render loading indicator for extraction
+	 */
+	private renderLoadingIndicator(type: 'llm' | 'regex' = 'llm'): void {
+		// Clear existing indicator
+		if (this.loadingIndicatorEl) {
+			this.loadingIndicatorEl.remove();
+		}
+
+		// Create loading section (insert after original text, before triple inputs)
+		this.loadingIndicatorEl = this.contentEl.createDiv({
+			cls: 'claim-extraction-loading',
+		});
+
+		this.loadingIndicatorEl.createSpan({
+			cls: 'loading-spinner',
+		});
+
+		const text =
+			type === 'llm'
+				? '✨ AI analyzing your claim...'
+				: '🔍 Analyzing text patterns...';
+
+		this.loadingIndicatorEl.createSpan({
+			text: text,
+			cls: 'loading-text',
+		});
+	}
+
+	/**
+	 * Hide loading indicator
+	 */
+	private hideLoadingIndicator(): void {
+		if (this.loadingIndicatorEl) {
+			this.loadingIndicatorEl.remove();
+			this.loadingIndicatorEl = null;
+		}
+
+		if (this.extractionTimeout) {
+			clearTimeout(this.extractionTimeout);
+			this.extractionTimeout = null;
+		}
+	}
+
+	/**
 	 * Auto-extract triple from text
 	 */
 	private async autoExtract(): Promise<void> {
+		// Determine if LLM will be used
+		const willUseLLM =
+			this.plugin.settings.llm.enabled &&
+			this.plugin.llmService.isAvailable();
+
+		// Show loading indicator
+		this.renderLoadingIndicator(willUseLLM ? 'llm' : 'regex');
+
+		// Set timeout to hide indicator if extraction takes too long
+		this.extractionTimeout = setTimeout(() => {
+			this.hideLoadingIndicator();
+			this.plugin.noticeManager.warning(
+				'Extraction is taking longer than expected'
+			);
+		}, 10000); // 10 second timeout
+
 		try {
 			const suggestion =
 				await this.plugin.claimParserService.extractTriple(
 					this.selectedText
 				);
+
+			// Hide loading BEFORE showing results
+			this.hideLoadingIndicator();
 
 			if (
 				!suggestion ||
@@ -577,6 +647,7 @@ export class ClaimModal extends Modal {
 			}
 		} catch (error) {
 			console.debug('Auto-extraction failed:', error);
+			this.hideLoadingIndicator();
 		}
 	}
 
