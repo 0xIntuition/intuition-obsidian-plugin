@@ -39,6 +39,9 @@ export class ClaimModal extends Modal {
 
 	// LLM-related
 	private llmMetadataEl: HTMLElement | null = null;
+	// Track current suggestion for potential future use (e.g., re-rendering on changes)
+	// @ts-expect-error - Used for storing suggestion metadata for predicate alternatives
+	private currentSuggestion: TripleSuggestion | null = null;
 
 	// Loading state
 	private isExtracting = false;
@@ -811,10 +814,99 @@ export class ClaimModal extends Modal {
 	}
 
 	/**
+	 * Render predicate alternatives as clickable pills
+	 */
+	private renderPredicateAlternatives(alternatives: string[]): void {
+		// Clear existing alternatives
+		const existingAlts = this.tripleInputsEl.querySelector('.predicate-alternatives');
+		if (existingAlts) {
+			existingAlts.remove();
+		}
+
+		// Only show if we have alternatives
+		if (!alternatives || alternatives.length === 0) {
+			return;
+		}
+
+		// Find the predicate field container
+		const predicateField = this.tripleInputsEl.querySelector('.claim-field:nth-child(2)');
+		if (!predicateField) return;
+
+		// Create alternatives container
+		const altContainer = predicateField.createDiv({
+			cls: 'predicate-alternatives'
+		});
+
+		altContainer.createSpan({
+			text: 'Alternatives: ',
+			cls: 'alternatives-label'
+		});
+
+		const pillsContainer = altContainer.createDiv({
+			cls: 'alternatives-pills'
+		});
+
+		// Limit to 5 alternatives
+		const maxAlternatives = 5;
+		const displayAlternatives = alternatives.slice(0, maxAlternatives);
+
+		// Render each alternative as a pill
+		displayAlternatives.forEach(alt => {
+			const pill = pillsContainer.createEl('button', {
+				text: alt,
+				cls: 'predicate-pill'
+			});
+
+			// Highlight if this is the current predicate
+			if (this.draft.predicate?.label === alt) {
+				pill.addClass('is-selected');
+			}
+
+			pill.addEventListener('click', () => {
+				this.selectPredicateAlternative(alt);
+			});
+		});
+
+		// Show "more" indicator if truncated
+		if (alternatives.length > maxAlternatives) {
+			const moreText = altContainer.createSpan({
+				text: `+${alternatives.length - maxAlternatives} more`,
+				cls: 'alternatives-more'
+			});
+			moreText.style.fontSize = '12px';
+			moreText.style.color = 'var(--text-muted)';
+		}
+	}
+
+	/**
+	 * Handle clicking a predicate alternative
+	 */
+	private async selectPredicateAlternative(predicate: string): Promise<void> {
+		try {
+			// Update predicate field
+			await this.predicateSearch.setValue(predicate);
+
+			// Trigger validation and existence check
+			this.validateDraft();
+			await this.checkIfClaimExists();
+
+			// Show feedback
+			this.plugin.noticeManager.success(`Predicate updated to "${predicate}"`);
+
+		} catch (error) {
+			this.plugin.noticeManager.error('Failed to update predicate');
+			console.error('Predicate alternative error:', error);
+		}
+	}
+
+	/**
 	 * Render LLM confidence and metadata UI
 	 */
 	private renderLLMMetadata(suggestion: TripleSuggestion): void {
 		if (!suggestion.llmMetadata) return;
+
+		// Store suggestion for later use
+		this.currentSuggestion = suggestion;
 
 		const metadata = suggestion.llmMetadata;
 
@@ -900,6 +992,11 @@ export class ClaimModal extends Modal {
 		typesEl.setText(
 			`Types: ${metadata.subjectType} → ${metadata.objectType}`
 		);
+
+		// Render predicate alternatives (after all metadata)
+		if (metadata.predicateAlternatives && metadata.predicateAlternatives.length > 0) {
+			this.renderPredicateAlternatives(metadata.predicateAlternatives);
+		}
 	}
 
 	/**
