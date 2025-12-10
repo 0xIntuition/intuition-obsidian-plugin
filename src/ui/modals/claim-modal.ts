@@ -705,7 +705,7 @@ export class ClaimModal extends Modal {
 
 				// Ensure subject and object are not empty and don't contain the entire suggestion
 				if (subject.length > 0 && object.length > 0 &&
-				    subject !== suggestion && object !== suggestion) {
+					subject !== suggestion && object !== suggestion) {
 					return {
 						subject,
 						predicate: pred,
