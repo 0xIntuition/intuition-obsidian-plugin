@@ -463,8 +463,41 @@ export class AtomSearchInput {
 
 	/**
 	 * Set the component value programmatically
+	 * Triggers search and auto-selects first match if available
+	 * If no match, creates new atom with the label
 	 */
-	setValue(ref: AtomReference): void {
+	async setValue(label: string): Promise<void> {
+		// Set input text
+		this.inputEl.value = label;
+		this.state.query = label;
+
+		// Trigger search
+		await this.performSearch(label);
+
+		// Auto-select first result if available
+		if (this.state.results.length > 0) {
+			const atom = this.state.results[0];
+			this.selectAtom({
+				type: 'existing',
+				termId: atom.id,
+				label: atom.label,
+				atom,
+				confidence: 1,
+			});
+		} else if (this.config.allowCreate) {
+			// No existing atom, create new one
+			this.selectAtom({
+				type: 'new',
+				label: label,
+				confidence: 1,
+			});
+		}
+	}
+
+	/**
+	 * Set the component value with an AtomReference
+	 */
+	setValueFromReference(ref: AtomReference): void {
 		this.inputEl.value = ref.label;
 		this.showPreview(ref);
 	}

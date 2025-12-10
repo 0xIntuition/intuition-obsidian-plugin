@@ -675,6 +675,138 @@ export class ClaimModal extends Modal {
 	}
 
 	/**
+	 * Parse suggestion string into triple components using regex patterns
+	 */
+	private parseSuggestionRegex(
+		suggestion: string,
+		originalPredicate: string
+	): { subject: string; predicate: string; object: string } | null {
+		// Common predicates to try
+		const predicates = [
+			'created', 'developed', 'founded', 'built', 'invented',
+			'is a', 'is an', 'is',
+			'has', 'uses', 'contains',
+			'launched', 'released', 'published'
+		];
+
+		// Try original predicate first
+		predicates.unshift(originalPredicate);
+
+		for (const pred of predicates) {
+			// Escape special regex characters in predicate
+			const escapedPred = pred.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			const pattern = new RegExp(`^(.+?)\\s+${escapedPred}\\s+(.+)$`, 'i');
+			const match = suggestion.match(pattern);
+
+			if (match && match[1].trim() && match[2].trim()) {
+				// Validate that we have reasonable subject and object
+				const subject = match[1].trim();
+				const object = match[2].trim();
+
+				// Ensure subject and object are not empty and don't contain the entire suggestion
+				if (subject.length > 0 && object.length > 0 &&
+				    subject !== suggestion && object !== suggestion) {
+					return {
+						subject,
+						predicate: pred,
+						object
+					};
+				}
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Parse suggestion string into triple components (hybrid approach)
+	 */
+	private async parseSuggestion(
+		suggestion: string,
+		originalPredicate: string
+	): Promise<{ subject: string; predicate: string; object: string } | null> {
+		// Try regex parsing first (fast)
+		const regexResult = this.parseSuggestionRegex(suggestion, originalPredicate);
+		if (regexResult) {
+			return regexResult;
+		}
+
+		// Fallback: Re-extract with LLM if available
+		if (this.plugin.settings.llm.enabled && this.plugin.llmService.isAvailable()) {
+			try {
+				const extracted = await this.plugin.llmService.extractClaims(suggestion);
+				if (extracted.length > 0) {
+					const claim = extracted[0];
+					return {
+						subject: claim.subject.text,
+						predicate: claim.predicate.text,
+						object: claim.object.text
+					};
+				}
+			} catch (error) {
+				console.debug('LLM re-extraction failed:', error);
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Apply LLM's suggested improvement to all fields
+	 */
+	private async applySuggestion(suggestion: TripleSuggestion): Promise<void> {
+		if (!suggestion.llmMetadata?.suggestedImprovement) {
+			return;
+		}
+
+		// Show loading state on button
+		const applyButton = this.llmMetadataEl?.querySelector('.apply-suggestion-btn') as HTMLButtonElement;
+		if (applyButton) {
+			applyButton.disabled = true;
+			applyButton.setText('Applying...');
+		}
+
+		try {
+			// Parse suggestion into components
+			const components = await this.parseSuggestion(
+				suggestion.llmMetadata.suggestedImprovement,
+				suggestion.predicate
+			);
+
+			if (!components) {
+				throw new Error('Failed to parse suggestion');
+			}
+
+			// Apply to all three fields
+			await this.subjectSearch.setValue(components.subject);
+			await this.predicateSearch.setValue(components.predicate);
+			await this.objectSearch.setValue(components.object);
+
+			// Hide suggestion UI (it's been applied)
+			if (this.llmMetadataEl) {
+				const improvementEl = this.llmMetadataEl.querySelector('.llm-improvement');
+				improvementEl?.remove();
+			}
+
+			// Trigger validation and existence check
+			this.validateDraft();
+			await this.checkIfClaimExists();
+
+			this.plugin.noticeManager.success('Suggestion applied successfully');
+
+		} catch (error) {
+			this.plugin.noticeManager.error('Failed to apply suggestion');
+			console.error('Apply suggestion error:', error);
+
+			// Reset button
+			if (applyButton) {
+				applyButton.disabled = false;
+				applyButton.setText('Apply Suggestion');
+			}
+		}
+	}
+
+	/**
 	 * Render LLM confidence and metadata UI
 	 */
 	private renderLLMMetadata(suggestion: TripleSuggestion): void {
@@ -720,7 +852,7 @@ export class ClaimModal extends Modal {
 			reasoningEl.createEl('p', { text: metadata.reasoning });
 		}
 
-		// Suggested improvement
+		// Suggested improvement with Apply button
 		if (metadata.suggestedImprovement) {
 			const improvementEl = this.llmMetadataEl.createDiv({
 				cls: 'llm-improvement',
@@ -728,8 +860,20 @@ export class ClaimModal extends Modal {
 			improvementEl.createEl('strong', {
 				text: 'Suggested improvement:',
 			});
-			improvementEl.createEl('p', {
+
+			const suggestionText = improvementEl.createEl('p', {
 				text: metadata.suggestedImprovement,
+			});
+			suggestionText.style.marginBottom = '8px';
+
+			// Apply button
+			const applyButton = improvementEl.createEl('button', {
+				text: 'Apply Suggestion',
+				cls: 'apply-suggestion-btn mod-cta',
+			});
+
+			applyButton.addEventListener('click', () => {
+				this.applySuggestion(suggestion);
 			});
 		}
 
