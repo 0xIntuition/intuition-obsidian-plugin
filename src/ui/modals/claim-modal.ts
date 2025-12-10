@@ -560,9 +560,15 @@ export class ClaimModal extends Modal {
 		}
 
 		// Create loading section (insert after original text, before triple inputs)
-		this.loadingIndicatorEl = this.contentEl.createDiv({
+		const tempDiv = this.contentEl.createDiv({
 			cls: 'claim-extraction-loading',
 		});
+
+		// Insert after originalTextEl
+		this.loadingIndicatorEl = this.originalTextEl.insertAdjacentElement(
+			'afterend',
+			tempDiv
+		) as HTMLElement;
 
 		this.loadingIndicatorEl.createSpan({
 			cls: 'loading-spinner',

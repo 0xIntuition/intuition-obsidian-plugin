@@ -76,57 +76,98 @@ describe('ClaimModal - Loading States', () => {
 		it('should show loading indicator when LLM is enabled', async () => {
 			modal.onOpen();
 
-			// Wait for next microtask for async autoExtract to start
-			await Promise.resolve();
-
-			// Check for loading indicator
-			const loadingEl = modal.contentEl.querySelector(
-				'.claim-extraction-loading'
+			// Wait for loading indicator to appear
+			await vi.waitFor(
+				() => {
+					const loadingEl = modal.contentEl.querySelector(
+						'.claim-extraction-loading'
+					);
+					expect(loadingEl).toBeTruthy();
+					expect(loadingEl?.textContent).toContain('AI analyzing');
+				},
+				{ timeout: 1000 }
 			);
-			expect(loadingEl).toBeTruthy();
-			expect(loadingEl?.textContent).toContain('AI analyzing');
 		});
 
 		it('should show regex loading when LLM is disabled', async () => {
 			plugin.settings.llm.enabled = false;
 
 			modal.onOpen();
-			await Promise.resolve();
 
-			const loadingEl = modal.contentEl.querySelector(
-				'.claim-extraction-loading'
+			await vi.waitFor(
+				() => {
+					const loadingEl = modal.contentEl.querySelector(
+						'.claim-extraction-loading'
+					);
+					expect(loadingEl).toBeTruthy();
+					expect(loadingEl?.textContent).toContain('Analyzing text patterns');
+				},
+				{ timeout: 1000 }
 			);
-			expect(loadingEl).toBeTruthy();
-			expect(loadingEl?.textContent).toContain('Analyzing text patterns');
 		});
 
 		it('should show regex loading when LLM is locked', async () => {
 			plugin.llmService.isAvailable = vi.fn(() => false);
 
 			modal.onOpen();
-			await Promise.resolve();
 
-			const loadingEl = modal.contentEl.querySelector(
-				'.claim-extraction-loading'
+			await vi.waitFor(
+				() => {
+					const loadingEl = modal.contentEl.querySelector(
+						'.claim-extraction-loading'
+					);
+					expect(loadingEl).toBeTruthy();
+					expect(loadingEl?.textContent).toContain('Analyzing text patterns');
+				},
+				{ timeout: 1000 }
 			);
-			expect(loadingEl).toBeTruthy();
-			expect(loadingEl?.textContent).toContain('Analyzing text patterns');
 		});
 
 		it('should display spinner element', async () => {
 			modal.onOpen();
-			await Promise.resolve();
 
-			const spinner = modal.contentEl.querySelector('.loading-spinner');
-			expect(spinner).toBeTruthy();
+			await vi.waitFor(
+				() => {
+					const spinner = modal.contentEl.querySelector('.loading-spinner');
+					expect(spinner).toBeTruthy();
+				},
+				{ timeout: 1000 }
+			);
 		});
 
 		it('should display loading text element', async () => {
 			modal.onOpen();
-			await Promise.resolve();
 
-			const loadingText = modal.contentEl.querySelector('.loading-text');
-			expect(loadingText).toBeTruthy();
+			await vi.waitFor(
+				() => {
+					const loadingText = modal.contentEl.querySelector('.loading-text');
+					expect(loadingText).toBeTruthy();
+				},
+				{ timeout: 1000 }
+			);
+		});
+
+		it('should insert loading indicator after original text', async () => {
+			modal.onOpen();
+
+			// Wait for loading indicator to appear and verify position
+			await vi.waitFor(
+				() => {
+					const originalText = modal.contentEl.querySelector(
+						'.claim-original-text'
+					);
+					const loadingEl = modal.contentEl.querySelector(
+						'.claim-extraction-loading'
+					);
+
+					expect(originalText).toBeTruthy();
+					expect(loadingEl).toBeTruthy();
+
+					// Loading should come after original text in DOM order
+					expect(originalText?.nextElementSibling).toBe(loadingEl);
+				},
+				{ timeout: 1000 }
+			);
 		});
 	});
 
@@ -140,16 +181,10 @@ describe('ClaimModal - Loading States', () => {
 					const loadingEl = modal.contentEl.querySelector(
 						'.claim-extraction-loading'
 					);
-					return loadingEl === null;
+					expect(loadingEl).toBeNull();
 				},
-				{ timeout: 1000 }
+				{ timeout: 2000, interval: 50 }
 			);
-
-			// Verify loading indicator is gone
-			const loadingEl = modal.contentEl.querySelector(
-				'.claim-extraction-loading'
-			);
-			expect(loadingEl).toBeNull();
 		});
 
 		it('should timeout and hide indicator after 10 seconds', async () => {
@@ -161,22 +196,26 @@ describe('ClaimModal - Loading States', () => {
 			timeController.useFakeTimers();
 
 			modal.onOpen();
-			await Promise.resolve();
 
 			// Verify loading is shown
-			let loadingEl = modal.contentEl.querySelector(
-				'.claim-extraction-loading'
+			await vi.waitFor(
+				() => {
+					const loadingEl = modal.contentEl.querySelector(
+						'.claim-extraction-loading'
+					);
+					expect(loadingEl).toBeTruthy();
+				},
+				{ timeout: 1000 }
 			);
-			expect(loadingEl).toBeTruthy();
 
 			// Advance time by 10 seconds
 			timeController.advanceTime(10000);
 
 			// Verify loading is hidden
-			loadingEl = modal.contentEl.querySelector(
+			const loadingElAfter = modal.contentEl.querySelector(
 				'.claim-extraction-loading'
 			);
-			expect(loadingEl).toBeNull();
+			expect(loadingElAfter).toBeNull();
 
 			// Verify warning notice was shown
 			expect(plugin.noticeManager.warning).toHaveBeenCalledWith(
@@ -200,16 +239,10 @@ describe('ClaimModal - Loading States', () => {
 					const loadingEl = modal.contentEl.querySelector(
 						'.claim-extraction-loading'
 					);
-					return loadingEl === null;
+					expect(loadingEl).toBeNull();
 				},
-				{ timeout: 1000 }
+				{ timeout: 2000, interval: 50 }
 			);
-
-			// Verify loading indicator is gone
-			const loadingEl = modal.contentEl.querySelector(
-				'.claim-extraction-loading'
-			);
-			expect(loadingEl).toBeNull();
 		});
 
 		it('should hide loading when low confidence suggestion is returned', async () => {
@@ -230,16 +263,10 @@ describe('ClaimModal - Loading States', () => {
 					const loadingEl = modal.contentEl.querySelector(
 						'.claim-extraction-loading'
 					);
-					return loadingEl === null;
+					expect(loadingEl).toBeNull();
 				},
-				{ timeout: 1000 }
+				{ timeout: 2000, interval: 50 }
 			);
-
-			// Verify loading indicator is gone
-			const loadingEl = modal.contentEl.querySelector(
-				'.claim-extraction-loading'
-			);
-			expect(loadingEl).toBeNull();
 
 			// Verify no notice was shown (confidence too low)
 			expect(plugin.noticeManager.info).not.toHaveBeenCalled();
@@ -286,23 +313,28 @@ describe('ClaimModal - Loading States', () => {
 	describe('User Interaction During Loading', () => {
 		it('should allow fields to remain editable during loading', async () => {
 			modal.onOpen();
-			await Promise.resolve();
 
-			// Check that loading indicator exists
-			const loadingEl = modal.contentEl.querySelector(
-				'.claim-extraction-loading'
+			// Wait for loading indicator and verify fields
+			await vi.waitFor(
+				() => {
+					// Check that loading indicator exists
+					const loadingEl = modal.contentEl.querySelector(
+						'.claim-extraction-loading'
+					);
+					expect(loadingEl).toBeTruthy();
+
+					// Verify input fields are present and not disabled
+					const inputs = modal.contentEl.querySelectorAll(
+						'.intuition-atom-search-input'
+					);
+					expect(inputs.length).toBeGreaterThan(0);
+
+					inputs.forEach((input) => {
+						expect((input as HTMLInputElement).disabled).toBe(false);
+					});
+				},
+				{ timeout: 1000 }
 			);
-			expect(loadingEl).toBeTruthy();
-
-			// Verify input fields are present and not disabled
-			const inputs = modal.contentEl.querySelectorAll(
-				'.intuition-atom-search-input'
-			);
-			expect(inputs.length).toBeGreaterThan(0);
-
-			inputs.forEach((input) => {
-				expect((input as HTMLInputElement).disabled).toBe(false);
-			});
 		});
 	});
 
@@ -313,9 +345,9 @@ describe('ClaimModal - Loading States', () => {
 			// Wait for extraction to complete
 			await vi.waitFor(
 				() => {
-					return (plugin.noticeManager.info as any).mock.calls.length > 0;
+					expect(plugin.noticeManager.info).toHaveBeenCalled();
 				},
-				{ timeout: 1000 }
+				{ timeout: 2000, interval: 50 }
 			);
 
 			// Verify notice was shown with correct message
@@ -364,9 +396,9 @@ describe('ClaimModal - Loading States', () => {
 
 			await vi.waitFor(
 				() => {
-					return (plugin.noticeManager.info as any).mock.calls.length > 0;
+					expect(plugin.noticeManager.info).toHaveBeenCalled();
 				},
-				{ timeout: 1000 }
+				{ timeout: 2000, interval: 50 }
 			);
 
 			expect(plugin.noticeManager.info).toHaveBeenCalledWith(
@@ -388,16 +420,12 @@ describe('ClaimModal - Loading States', () => {
 					const loadingEl = modal.contentEl.querySelector(
 						'.claim-extraction-loading'
 					);
-					return loadingEl === null;
+					expect(loadingEl).toBeNull();
 				},
-				{ timeout: 1000 }
+				{ timeout: 2000, interval: 50 }
 			);
 
-			// Verify loading is hidden and no notice shown
-			const loadingEl = modal.contentEl.querySelector(
-				'.claim-extraction-loading'
-			);
-			expect(loadingEl).toBeNull();
+			// Verify no notice shown
 			expect(plugin.noticeManager.info).not.toHaveBeenCalled();
 		});
 
@@ -413,26 +441,25 @@ describe('ClaimModal - Loading States', () => {
 					const loadingEl = modal.contentEl.querySelector(
 						'.claim-extraction-loading'
 					);
-					return loadingEl === null;
+					expect(loadingEl).toBeNull();
 				},
-				{ timeout: 1000 }
+				{ timeout: 2000, interval: 50 }
 			);
-
-			const loadingEl = modal.contentEl.querySelector(
-				'.claim-extraction-loading'
-			);
-			expect(loadingEl).toBeNull();
 		});
 
 		it('should not show duplicate loading indicators on re-render', async () => {
 			modal.onOpen();
-			await Promise.resolve();
 
-			// Count loading indicators
-			const loadingEls = modal.contentEl.querySelectorAll(
-				'.claim-extraction-loading'
+			// Wait for loading indicator and verify only one exists
+			await vi.waitFor(
+				() => {
+					const loadingEls = modal.contentEl.querySelectorAll(
+						'.claim-extraction-loading'
+					);
+					expect(loadingEls.length).toBe(1);
+				},
+				{ timeout: 1000 }
 			);
-			expect(loadingEls.length).toBe(1);
 		});
 	});
 });
