@@ -147,7 +147,18 @@ export class StakeModal extends Modal {
 	 * Calculate impact preview
 	 */
 	private async calculateImpact(): Promise<void> {
-		const amount = parseEther(this.stakeAmount || '0');
+		let amount: bigint;
+		try {
+			amount = parseEther(this.stakeAmount || '0');
+		} catch {
+			// Invalid input - clear impact and plan
+			this.impact = null;
+			this.plan = null;
+			this.isCalculating = false;
+			this.renderImpact();
+			this.renderPlan();
+			return;
+		}
 
 		if (amount <= BigInt(0)) {
 			this.impact = null;
@@ -361,7 +372,14 @@ export class StakeModal extends Modal {
 			return;
 		}
 
-		const amount = parseEther(this.stakeAmount || '0');
+		let amount: bigint;
+		try {
+			amount = parseEther(this.stakeAmount || '0');
+		} catch {
+			this.plugin.noticeManager.error('Invalid stake amount format');
+			return;
+		}
+
 		if (amount <= BigInt(0)) {
 			this.plugin.noticeManager.error('Invalid stake amount');
 			return;

@@ -98,9 +98,60 @@ export const MULTI_VAULT_ABI = [
 	},
 ] as const;
 
-// Fee constants (in ETH, will be converted to wei)
+/**
+ * Fee constants (in ETH, will be converted to wei)
+ *
+ * WARNING: These fee values are hardcoded and may become stale if the protocol
+ * updates its fee structure on-chain. If transaction costs are incorrect,
+ * verify current fees in the protocol contract and update these constants.
+ *
+ * @see https://docs.intuition.systems for current fee information
+ */
 const ATOM_CREATION_FEE = parseEther('0.0003');
 const TRIPLE_CREATION_FEE = parseEther('0.0004');
+
+/**
+ * Type guards for decoded event logs
+ */
+type AtomCreatedArgs = {
+	id: bigint;
+	creator: `0x${string}`;
+	atomUri: `0x${string}`;
+};
+
+type TripleCreatedArgs = {
+	id: bigint;
+	creator: `0x${string}`;
+	subjectId: bigint;
+	predicateId: bigint;
+	objectId: bigint;
+};
+
+type DepositedArgs = {
+	sender: `0x${string}`;
+	receiver: `0x${string}`;
+	id: bigint;
+	assets: bigint;
+	shares: bigint;
+};
+
+function isAtomCreatedEvent(
+	decoded: { eventName: string; args: unknown }
+): decoded is { eventName: 'AtomCreated'; args: AtomCreatedArgs } {
+	return decoded.eventName === 'AtomCreated';
+}
+
+function isTripleCreatedEvent(
+	decoded: { eventName: string; args: unknown }
+): decoded is { eventName: 'TripleCreated'; args: TripleCreatedArgs } {
+	return decoded.eventName === 'TripleCreated';
+}
+
+function isDepositedEvent(
+	decoded: { eventName: string; args: unknown }
+): decoded is { eventName: 'Deposited'; args: DepositedArgs } {
+	return decoded.eventName === 'Deposited';
+}
 
 /**
  * Service for building and executing blockchain transactions
@@ -245,10 +296,16 @@ export class TransactionService extends BaseService {
 				: intuitionTestnet;
 
 		// Validate balance before starting
+		// Include gas estimation (conservative: 50 gwei gas price)
+		const gasPrice = BigInt(50_000_000_000); // 50 gwei
+		const estimatedGasCost = plan.estimatedGas * gasPrice;
+		const totalRequired = plan.totalCost + estimatedGasCost;
+
 		const balance = this.plugin.walletService.getState().balance || BigInt(0);
-		if (balance < plan.totalCost) {
+		if (balance < totalRequired) {
+			const costBreakdown = `Protocol fees: ${Number(plan.totalCost) / 1e18} TRUST, Est. gas: ${Number(estimatedGasCost) / 1e18} TRUST`;
 			throw new Error(
-				`Insufficient balance. Required: ${Number(plan.totalCost) / 1e18} TRUST, Available: ${Number(balance) / 1e18} TRUST`
+				`Insufficient balance. Required: ${Number(totalRequired) / 1e18} TRUST (${costBreakdown}), Available: ${Number(balance) / 1e18} TRUST`
 			);
 		}
 
@@ -330,7 +387,11 @@ export class TransactionService extends BaseService {
 							topics: atomCreatedLog.topics,
 						});
 
-						const atomId = decodedAtom.args.id as bigint;
+						if (!isAtomCreatedEvent(decodedAtom)) {
+							throw new Error('Failed to decode AtomCreated event');
+						}
+
+						const atomId = decodedAtom.args.id;
 						atomsCreated.push(hash);
 
 						// Assign to correct field
@@ -413,7 +474,11 @@ export class TransactionService extends BaseService {
 							topics: tripleCreatedLog.topics,
 						});
 
-						tripleId = decodedTriple.args.id as bigint;
+						if (!isTripleCreatedEvent(decodedTriple)) {
+							throw new Error('Failed to decode TripleCreated event');
+						}
+
+						tripleId = decodedTriple.args.id;
 						break;
 					}
 
@@ -435,12 +500,12 @@ export class TransactionService extends BaseService {
 						} else {
 							// Against position uses the counter vault
 							// Always get from contract as the source of truth
-							const counterVaultId = (await publicClient.readContract({
+							const counterVaultId = await publicClient.readContract({
 								address: multiVaultAddress,
 								abi: MULTI_VAULT_ABI,
 								functionName: 'getCounterIdFromTripleId',
 								args: [tripleId],
-							})) as bigint;
+							});
 							vaultId = counterVaultId;
 						}
 
@@ -486,16 +551,11 @@ export class TransactionService extends BaseService {
 							topics: depositedLog.topics,
 						});
 
-						// Type assertion: we know this is a Deposited event which has shares
-						sharesReceived = (
-							decodedDeposit.args as {
-								sender: `0x${string}`;
-								receiver: `0x${string}`;
-								id: bigint;
-								assets: bigint;
-								shares: bigint;
-							}
-						).shares;
+						if (!isDepositedEvent(decodedDeposit)) {
+							throw new Error('Failed to decode Deposited event');
+						}
+
+						sharesReceived = decodedDeposit.args.shares;
 						break;
 					}
 				}

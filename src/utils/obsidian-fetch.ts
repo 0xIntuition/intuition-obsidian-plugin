@@ -87,7 +87,9 @@ class ObsidianResponse implements Response {
 	readonly ok: boolean;
 	readonly headers: Headers;
 	readonly body: null = null; // No streaming support
-	readonly bodyUsed = false;
+	get bodyUsed(): boolean {
+		return this._consumed;
+	}
 
 	private _arrayBuffer: ArrayBuffer;
 	private _text: string;
@@ -151,7 +153,7 @@ class ObsidianResponse implements Response {
 		const clonedResponse = {
 			status: this.status,
 			headers: headersObj,
-			arrayBuffer: this._arrayBuffer,
+			arrayBuffer: this._arrayBuffer.slice(0), // Deep copy ArrayBuffer
 			text: this._text,
 			json: this._json,
 		} as RequestUrlResponse;
