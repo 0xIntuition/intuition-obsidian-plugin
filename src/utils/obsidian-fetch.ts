@@ -36,11 +36,9 @@ export function createObsidianFetch(plugin: IntuitionPlugin): typeof fetch {
 			const { url, params } = await parseRequest(input, init);
 
 			// Call Obsidian's requestUrl
-			// requestUrl exists on Obsidian's DataAdapter but not in base types
+			// requestUrl exists on Obsidian's App object but not in base types
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const obsidianResponse = await (
-				plugin.app.vault.adapter as any
-			).requestUrl(params);
+			const obsidianResponse = await (plugin.app as any).requestUrl(params);
 
 			// Wrap in fetch-compatible Response
 			return new ObsidianResponse(url, obsidianResponse);

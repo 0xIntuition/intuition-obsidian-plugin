@@ -23,27 +23,23 @@ describe('LLM CORS Fix - Integration', () => {
 		mockPlugin = {
 			settings: structuredClone(DEFAULT_SETTINGS),
 			app: {
-				vault: {
-					adapter: {
-						// Mock requestUrl to verify it's being called
-						// In real Obsidian, this bypasses CORS
-						requestUrl: async (params: any) => {
-							// Make actual fetch call for testing
-							const response = await fetch(params.url, {
-								method: params.method,
-								headers: params.headers,
-								body: params.body,
-							});
+				// Mock requestUrl to verify it's being called
+				// In real Obsidian, this bypasses CORS
+				requestUrl: async (params: any) => {
+					// Make actual fetch call for testing
+					const response = await fetch(params.url, {
+						method: params.method,
+						headers: params.headers,
+						body: params.body,
+					});
 
-							return {
-								status: response.status,
-								headers: Object.fromEntries(response.headers.entries()),
-								arrayBuffer: await response.arrayBuffer(),
-								text: await response.text(),
-								json: await response.json().catch(() => null),
-							};
-						},
-					},
+					return {
+						status: response.status,
+						headers: Object.fromEntries(response.headers.entries()),
+						arrayBuffer: await response.arrayBuffer(),
+						text: await response.text(),
+						json: await response.json().catch(() => null),
+					};
 				},
 			},
 			noticeManager: {
@@ -147,8 +143,8 @@ describe('LLM CORS Fix - Integration', () => {
 			let requestUrlCalled = false;
 
 			// Override requestUrl to verify it's being called
-			const originalRequestUrl = mockPlugin.app.vault.adapter.requestUrl;
-			mockPlugin.app.vault.adapter.requestUrl = async (params: any) => {
+			const originalRequestUrl = mockPlugin.app.requestUrl;
+			mockPlugin.app.requestUrl = async (params: any) => {
 				requestUrlCalled = true;
 				return originalRequestUrl(params);
 			};

@@ -14,11 +14,7 @@ describe('createObsidianFetch', () => {
 		mockRequestUrl = vi.fn();
 		mockPlugin = {
 			app: {
-				vault: {
-					adapter: {
-						requestUrl: mockRequestUrl,
-					},
-				},
+				requestUrl: mockRequestUrl,
 			},
 		} as unknown as IntuitionPlugin;
 	});
