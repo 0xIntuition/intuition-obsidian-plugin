@@ -7,7 +7,7 @@ import type {
 	TransactionPlan,
 	VaultData,
 } from '../../types';
-import { ImpactCalculator } from '../../utils';
+import { ImpactCalculator, debounce } from '../../utils';
 import { NETWORKS } from '../../types/networks';
 import { TxConfirmModal } from './tx-confirm-modal';
 
@@ -29,10 +29,12 @@ export class StakeModal extends Modal {
 	private position: 'for' | 'against' = 'for';
 	private impact: ImpactPreview | null = null;
 	private plan: TransactionPlan | null = null;
+	private isCalculating = false;
 
 	private impactEl: HTMLElement;
 	private planEl: HTMLElement;
 	private submitButton: HTMLButtonElement;
+	private calculateImpactDebounced: ReturnType<typeof debounce>;
 
 	constructor(app: App, plugin: IntuitionPlugin, draft: ClaimDraft) {
 		super(app);
@@ -49,6 +51,12 @@ export class StakeModal extends Modal {
 
 		// Set default stake amount from settings
 		this.stakeAmount = this.plugin.settings.ui.defaultStakeAmount;
+
+		// Create debounced version of calculateImpact (300ms delay)
+		this.calculateImpactDebounced = debounce(
+			() => this.calculateImpact(),
+			300
+		);
 	}
 
 	onOpen() {
@@ -115,9 +123,7 @@ export class StakeModal extends Modal {
 					.setValue(this.stakeAmount)
 					.onChange((value) => {
 						this.stakeAmount = value;
-						this.calculateImpact().catch((error) => {
-							console.error('Failed to calculate impact:', error);
-						});
+						this.calculateImpactDebounced();
 					})
 			);
 
@@ -132,9 +138,7 @@ export class StakeModal extends Modal {
 					.setValue(this.position)
 					.onChange((value: 'for' | 'against') => {
 						this.position = value;
-						this.calculateImpact().catch((error) => {
-							console.error('Failed to calculate impact:', error);
-						});
+						this.calculateImpactDebounced();
 					})
 			);
 	}
@@ -148,10 +152,16 @@ export class StakeModal extends Modal {
 		if (amount <= BigInt(0)) {
 			this.impact = null;
 			this.plan = null;
+			this.isCalculating = false;
 			this.renderImpact();
 			this.renderPlan();
 			return;
 		}
+
+		// Set loading state
+		this.isCalculating = true;
+		this.renderImpact();
+		this.renderPlan();
 
 		try {
 			// Get vault data
@@ -171,9 +181,13 @@ export class StakeModal extends Modal {
 				{ amount, position: this.position }
 			);
 
+			this.isCalculating = false;
 			this.renderImpact();
 			this.renderPlan();
 		} catch (error) {
+			this.isCalculating = false;
+			this.renderImpact();
+			this.renderPlan();
 			console.error('Impact calculation failed:', error);
 			this.plugin.noticeManager.error(
 				`Failed to calculate impact: ${(error as Error).message}`
@@ -188,21 +202,27 @@ export class StakeModal extends Modal {
 		forVault: VaultData;
 		againstVault: VaultData;
 	}> {
-		if (this.draft.existingTriple) {
-			// Use existing vault data if available
-			// Note: existingTriple should have forVault and againstVault populated
-			// by the ClaimModal when it calls checkIfClaimExists
-			return {
-				forVault:
-					(this.draft.existingTriple as any).forVault ||
-					this.getEmptyVault(),
-				againstVault:
-					(this.draft.existingTriple as any).againstVault ||
-					this.getEmptyVault(),
-			};
+		if (this.draft.existingTriple && this.draft.consensus) {
+			// Query vault data for existing triple
+			try {
+				const forVault = await this.plugin.intuitionService.getVaultState(
+					this.draft.consensus.forVaultId
+				);
+				const againstVault = await this.plugin.intuitionService.getVaultState(
+					this.draft.consensus.againstVaultId
+				);
+
+				return {
+					forVault: forVault || this.getEmptyVault(),
+					againstVault: againstVault || this.getEmptyVault(),
+				};
+			} catch (error) {
+				console.error('Failed to fetch vault data:', error);
+				// Fall through to empty vaults
+			}
 		}
 
-		// New claim - use empty vaults
+		// New claim or failed to fetch - use empty vaults
 		return {
 			forVault: this.getEmptyVault(),
 			againstVault: this.getEmptyVault(),
@@ -229,6 +249,15 @@ export class StakeModal extends Modal {
 	 */
 	private renderImpact(): void {
 		this.impactEl.empty();
+
+		if (this.isCalculating) {
+			this.impactEl.createEl('h4', { text: 'Impact Preview' });
+			this.impactEl.createDiv({
+				text: 'Calculating...',
+				cls: 'loading-indicator',
+			});
+			return;
+		}
 
 		if (!this.impact) return;
 
@@ -275,6 +304,15 @@ export class StakeModal extends Modal {
 	 */
 	private renderPlan(): void {
 		this.planEl.empty();
+
+		if (this.isCalculating) {
+			this.planEl.createEl('h4', { text: 'Transaction Steps' });
+			this.planEl.createDiv({
+				text: 'Building plan...',
+				cls: 'loading-indicator',
+			});
+			return;
+		}
 
 		if (!this.plan) return;
 

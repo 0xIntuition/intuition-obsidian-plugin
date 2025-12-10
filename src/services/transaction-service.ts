@@ -1,4 +1,8 @@
-import { parseEther, type Hex, bytesToHex } from 'viem';
+import { parseEther, type Hex, bytesToHex, decodeEventLog } from 'viem';
+import {
+	intuitionTestnet,
+	intuitionMainnet,
+} from '@0xintuition/protocol';
 import { BaseService } from './base-service';
 import type {
 	ClaimDraft,
@@ -59,6 +63,38 @@ export const MULTI_VAULT_ABI = [
 		stateMutability: 'view',
 		inputs: [{ name: 'id', type: 'uint256' }],
 		outputs: [{ name: 'counterId', type: 'uint256' }],
+	},
+	// Events
+	{
+		name: 'AtomCreated',
+		type: 'event',
+		inputs: [
+			{ name: 'id', type: 'uint256', indexed: true },
+			{ name: 'creator', type: 'address', indexed: true },
+			{ name: 'atomUri', type: 'bytes', indexed: false },
+		],
+	},
+	{
+		name: 'TripleCreated',
+		type: 'event',
+		inputs: [
+			{ name: 'id', type: 'uint256', indexed: true },
+			{ name: 'creator', type: 'address', indexed: true },
+			{ name: 'subjectId', type: 'uint256', indexed: false },
+			{ name: 'predicateId', type: 'uint256', indexed: false },
+			{ name: 'objectId', type: 'uint256', indexed: false },
+		],
+	},
+	{
+		name: 'Deposited',
+		type: 'event',
+		inputs: [
+			{ name: 'sender', type: 'address', indexed: true },
+			{ name: 'receiver', type: 'address', indexed: true },
+			{ name: 'id', type: 'uint256', indexed: true },
+			{ name: 'assets', type: 'uint256', indexed: false },
+			{ name: 'shares', type: 'uint256', indexed: false },
+		],
 	},
 ] as const;
 
@@ -196,7 +232,25 @@ export class TransactionService extends BaseService {
 		const multiVaultAddress = network.multiVaultAddress;
 		const walletClient = this.plugin.walletService.getWalletClient();
 		const publicClient = this.plugin.walletService.getPublicClient();
-		const address = this.plugin.walletService.getAddress()!;
+		const address = this.plugin.walletService.getAddress();
+
+		if (!address) {
+			throw new Error('Wallet address not available');
+		}
+
+		// Get the appropriate chain config
+		const chain =
+			this.plugin.settings.network === 'mainnet'
+				? intuitionMainnet
+				: intuitionTestnet;
+
+		// Validate balance before starting
+		const balance = this.plugin.walletService.getState().balance || BigInt(0);
+		if (balance < plan.totalCost) {
+			throw new Error(
+				`Insufficient balance. Required: ${Number(plan.totalCost) / 1e18} TRUST, Available: ${Number(balance) / 1e18} TRUST`
+			);
+		}
 
 		const atomsCreated: Hex[] = [];
 		const transactionHashes: Hex[] = [];
@@ -230,7 +284,7 @@ export class TransactionService extends BaseService {
 						// Simplified atom URI: just encode the label
 						// In production, this would be a full IPFS metadata object
 						const atomUriBytes = new TextEncoder().encode(atomLabel);
-					const atomUri = bytesToHex(atomUriBytes);
+						const atomUri = bytesToHex(atomUriBytes);
 
 						hash = await walletClient.writeContract({
 							address: multiVaultAddress,
@@ -238,8 +292,8 @@ export class TransactionService extends BaseService {
 							functionName: 'createAtom',
 							args: [atomUri],
 							value: ATOM_CREATION_FEE,
-						account: address,
-						chain: null,
+							account: address,
+							chain,
 						});
 
 						step.status = 'confirming';
@@ -250,9 +304,33 @@ export class TransactionService extends BaseService {
 							hash,
 						});
 
-						// Parse atom ID from receipt
-						// TODO: Use viem's decodeEventLog for proper parsing
-						const atomId = BigInt(receipt.logs[0]?.topics[1] || '0');
+						// Parse atom ID from AtomCreated event
+						const atomCreatedLog = receipt.logs.find((log) => {
+							try {
+								const decoded = decodeEventLog({
+									abi: MULTI_VAULT_ABI,
+									data: log.data,
+									topics: log.topics,
+								});
+								return decoded.eventName === 'AtomCreated';
+							} catch {
+								return false;
+							}
+						});
+
+						if (!atomCreatedLog) {
+							throw new Error(
+								`AtomCreated event not found in receipt for atom: ${atomLabel}`
+							);
+						}
+
+						const decodedAtom = decodeEventLog({
+							abi: MULTI_VAULT_ABI,
+							data: atomCreatedLog.data,
+							topics: atomCreatedLog.topics,
+						});
+
+						const atomId = decodedAtom.args.id as bigint;
 						atomsCreated.push(hash);
 
 						// Assign to correct field
@@ -269,23 +347,38 @@ export class TransactionService extends BaseService {
 					case 'createTriple': {
 						// Get IDs for existing atoms
 						if (!subjectId && draft.subject?.type === 'existing') {
-							subjectId = BigInt(draft.subject.termId!);
+							if (!draft.subject.termId) {
+								throw new Error('Subject termId is missing');
+							}
+							subjectId = BigInt(draft.subject.termId);
 						}
 						if (!predicateId && draft.predicate?.type === 'existing') {
-							predicateId = BigInt(draft.predicate.termId!);
+							if (!draft.predicate.termId) {
+								throw new Error('Predicate termId is missing');
+							}
+							predicateId = BigInt(draft.predicate.termId);
 						}
 						if (!objectId && draft.object?.type === 'existing') {
-							objectId = BigInt(draft.object.termId!);
+							if (!draft.object.termId) {
+								throw new Error('Object termId is missing');
+							}
+							objectId = BigInt(draft.object.termId);
+						}
+
+						if (!subjectId || !predicateId || !objectId) {
+							throw new Error(
+								'Missing atom IDs for createTriple transaction'
+							);
 						}
 
 						hash = await walletClient.writeContract({
 							address: multiVaultAddress,
 							abi: MULTI_VAULT_ABI,
 							functionName: 'createTriple',
-							args: [subjectId!, predicateId!, objectId!],
+							args: [subjectId, predicateId, objectId],
 							value: TRIPLE_CREATION_FEE,
-						account: address,
-						chain: null,
+							account: address,
+							chain,
 						});
 
 						step.status = 'confirming';
@@ -296,8 +389,31 @@ export class TransactionService extends BaseService {
 							hash,
 						});
 
-						// Parse triple ID from receipt
-						tripleId = BigInt(receipt.logs[0]?.topics[1] || '0');
+						// Parse triple ID from TripleCreated event
+						const tripleCreatedLog = receipt.logs.find((log) => {
+							try {
+								const decoded = decodeEventLog({
+									abi: MULTI_VAULT_ABI,
+									data: log.data,
+									topics: log.topics,
+								});
+								return decoded.eventName === 'TripleCreated';
+							} catch {
+								return false;
+							}
+						});
+
+						if (!tripleCreatedLog) {
+							throw new Error('TripleCreated event not found in receipt');
+						}
+
+						const decodedTriple = decodeEventLog({
+							abi: MULTI_VAULT_ABI,
+							data: tripleCreatedLog.data,
+							topics: tripleCreatedLog.topics,
+						});
+
+						tripleId = decodedTriple.args.id as bigint;
 						break;
 					}
 
@@ -307,11 +423,15 @@ export class TransactionService extends BaseService {
 							tripleId = BigInt(draft.existingTriple.id);
 						}
 
+						if (!tripleId) {
+							throw new Error('Triple ID is not available for deposit');
+						}
+
 						// Determine vault ID based on position
 						let vaultId: bigint;
 						if (stakeConfig.position === 'for') {
 							// For position uses the triple's vault ID directly
-							vaultId = tripleId!;
+							vaultId = tripleId;
 						} else {
 							// Against position uses the counter vault
 							// Always get from contract as the source of truth
@@ -319,7 +439,7 @@ export class TransactionService extends BaseService {
 								address: multiVaultAddress,
 								abi: MULTI_VAULT_ABI,
 								functionName: 'getCounterIdFromTripleId',
-								args: [tripleId!],
+								args: [tripleId],
 							})) as bigint;
 							vaultId = counterVaultId;
 						}
@@ -330,8 +450,8 @@ export class TransactionService extends BaseService {
 							functionName: 'depositTriple',
 							args: [address, vaultId],
 							value: stakeConfig.amount,
-						account: address,
-						chain: null,
+							account: address,
+							chain,
 						});
 
 						step.status = 'confirming';
@@ -342,15 +462,46 @@ export class TransactionService extends BaseService {
 							hash,
 						});
 
-						// Parse shares received from receipt
-						// TODO: Use proper event decoding
-						sharesReceived = BigInt(receipt.logs[0]?.data || '0');
+						// Parse shares received from Deposited event
+						const depositedLog = receipt.logs.find((log) => {
+							try {
+								const decoded = decodeEventLog({
+									abi: MULTI_VAULT_ABI,
+									data: log.data,
+									topics: log.topics,
+								});
+								return decoded.eventName === 'Deposited';
+							} catch {
+								return false;
+							}
+						});
+
+						if (!depositedLog) {
+							throw new Error('Deposited event not found in receipt');
+						}
+
+						const decodedDeposit = decodeEventLog({
+							abi: MULTI_VAULT_ABI,
+							data: depositedLog.data,
+							topics: depositedLog.topics,
+						});
+
+						// Type assertion: we know this is a Deposited event which has shares
+						sharesReceived = (
+							decodedDeposit.args as {
+								sender: `0x${string}`;
+								receiver: `0x${string}`;
+								id: bigint;
+								assets: bigint;
+								shares: bigint;
+							}
+						).shares;
 						break;
 					}
 				}
 
 				step.status = 'confirmed';
-				transactionHashes.push(hash!);
+				transactionHashes.push(hash);
 				onStepUpdate(step);
 			}
 
