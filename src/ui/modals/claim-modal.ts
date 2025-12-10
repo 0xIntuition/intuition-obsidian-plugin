@@ -743,11 +743,14 @@ export class ClaimModal extends Modal {
 						object: claim.object.text
 					};
 				}
+				// LLM returned no claims
+				console.debug('LLM re-extraction returned no claims');
 			} catch (error) {
 				console.debug('LLM re-extraction failed:', error);
 			}
 		}
 
+		// Could not parse via regex or LLM
 		return null;
 	}
 
@@ -774,7 +777,7 @@ export class ClaimModal extends Modal {
 			);
 
 			if (!components) {
-				throw new Error('Failed to parse suggestion');
+				throw new Error('Could not parse suggestion into subject-predicate-object format. Please edit the fields manually.');
 			}
 
 			// Apply to all three fields
@@ -795,7 +798,8 @@ export class ClaimModal extends Modal {
 			this.plugin.noticeManager.success('Suggestion applied successfully');
 
 		} catch (error) {
-			this.plugin.noticeManager.error('Failed to apply suggestion');
+			const errorMessage = error instanceof Error ? error.message : 'Failed to apply suggestion';
+			this.plugin.noticeManager.error(errorMessage);
 			console.error('Apply suggestion error:', error);
 
 			// Reset button

@@ -471,8 +471,16 @@ export class AtomSearchInput {
 		this.inputEl.value = label;
 		this.state.query = label;
 
+		// Capture the search ID before triggering search
+		const searchId = this.currentSearchId + 1;
+
 		// Trigger search
 		await this.performSearch(label);
+
+		// Check if this is still the current search (prevent race condition)
+		if (searchId !== this.currentSearchId) {
+			return; // Newer search has started, discard these results
+		}
 
 		// Auto-select first result if available
 		if (this.state.results.length > 0) {
