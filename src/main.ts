@@ -1,7 +1,7 @@
 import { Plugin } from 'obsidian';
 import { IntuitionPluginSettings, DEFAULT_SETTINGS } from './types';
 import { NoticeManager, IntuitionSettingTab, WalletStatusBar, ClaimModal } from './ui';
-import { SettingsService, WalletService, IntuitionService, ClaimParserService, LLMService } from './services';
+import { SettingsService, WalletService, IntuitionService, ClaimParserService, LLMService, TransactionService } from './services';
 import { deepMergeSettings } from './utils';
 
 export default class IntuitionPlugin extends Plugin {
@@ -9,6 +9,7 @@ export default class IntuitionPlugin extends Plugin {
 	noticeManager: NoticeManager;
 	settingsService: SettingsService;
 	walletService: WalletService;
+	transactionService: TransactionService;
 	intuitionService: IntuitionService;
 	claimParserService: ClaimParserService;
 	llmService: LLMService;
@@ -30,6 +31,10 @@ export default class IntuitionPlugin extends Plugin {
 		// Initialize wallet service
 		this.walletService = new WalletService(this);
 		await this.walletService.initialize();
+
+		// Initialize transaction service
+		this.transactionService = new TransactionService(this);
+		await this.transactionService.initialize();
 
 		// Initialize LLM service
 		this.llmService = new LLMService(this);
@@ -97,6 +102,9 @@ export default class IntuitionPlugin extends Plugin {
 		}
 		if (this.intuitionService) {
 			this.intuitionService.cleanup();
+		}
+		if (this.transactionService) {
+			this.transactionService.cleanup();
 		}
 		if (this.llmService) {
 			this.llmService.cleanup();

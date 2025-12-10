@@ -6,4 +6,5 @@ export * from './graphql-client';
 export * from './intuition-service';
 export * from './llm-service';
 export * from './settings-service';
+export * from './transaction-service';
 export * from './wallet-service';

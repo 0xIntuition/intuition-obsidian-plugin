@@ -2,6 +2,8 @@ export * from './base-modal';
 export * from './notice-manager';
 export * from './settings-tab';
 export * from './modals/claim-modal';
+export * from './modals/stake-modal';
+export * from './modals/tx-confirm-modal';
 export * from './modals/wallet-setup-modal';
 export * from './modals/unlock-wallet-modal';
 export * from './modals/wallet-management-modal';

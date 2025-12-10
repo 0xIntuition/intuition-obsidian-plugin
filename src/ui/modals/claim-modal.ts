@@ -6,6 +6,7 @@
 import { App, Modal } from 'obsidian';
 import type IntuitionPlugin from '../../main';
 import { AtomSearchInput } from '../components/atom-search-input';
+import { StakeModal } from './stake-modal';
 import {
 	ClaimDraft,
 	ClaimStatus,
@@ -667,12 +668,8 @@ export class ClaimModal extends Modal {
 			return;
 		}
 
-		// Placeholder for Plan 007 (Stake flow)
-		this.plugin.noticeManager.info(
-			'Stake flow coming in Plan 007'
-		);
-
-		// Close modal
-		// this.close();
+		// Open stake modal
+		new StakeModal(this.app, this.plugin, this.draft).open();
+		this.close();
 	}
 }
