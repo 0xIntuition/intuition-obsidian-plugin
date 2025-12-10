@@ -40,6 +40,7 @@ export class ClaimModal extends Modal {
 	private llmMetadataEl: HTMLElement | null = null;
 
 	// Loading state
+	private isExtracting = false;
 	private extractionTimeout: NodeJS.Timeout | null = null;
 	private loadingIndicatorEl: HTMLElement | null = null;
 
@@ -559,10 +560,9 @@ export class ClaimModal extends Modal {
 			this.loadingIndicatorEl.remove();
 		}
 
-		// Create loading section (insert after original text, before triple inputs)
-		const tempDiv = this.contentEl.createDiv({
-			cls: 'claim-extraction-loading',
-		});
+		// Create loading section WITHOUT adding to DOM yet
+		const tempDiv = document.createElement('div');
+		tempDiv.className = 'claim-extraction-loading';
 
 		// Insert after originalTextEl
 		this.loadingIndicatorEl = this.originalTextEl.insertAdjacentElement(
@@ -570,6 +570,7 @@ export class ClaimModal extends Modal {
 			tempDiv
 		) as HTMLElement;
 
+		// Now add content to the positioned element
 		this.loadingIndicatorEl.createSpan({
 			cls: 'loading-spinner',
 		});
@@ -598,12 +599,21 @@ export class ClaimModal extends Modal {
 			clearTimeout(this.extractionTimeout);
 			this.extractionTimeout = null;
 		}
+
+		this.isExtracting = false;
 	}
 
 	/**
 	 * Auto-extract triple from text
 	 */
 	private async autoExtract(): Promise<void> {
+		// Prevent duplicate extractions
+		if (this.isExtracting) {
+			return;
+		}
+
+		this.isExtracting = true;
+
 		// Determine if LLM will be used
 		const willUseLLM =
 			this.plugin.settings.llm.enabled &&
