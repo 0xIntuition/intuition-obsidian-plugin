@@ -17,6 +17,7 @@ import {
 
 export class ClaimModal extends Modal {
 	private static readonly MIN_AUTO_SUGGESTION_CONFIDENCE = 0.5;
+	private static readonly EXTRACTION_TIMEOUT_MS = 10000;
 
 	private plugin: IntuitionPlugin;
 	private selectedText: string;
@@ -38,6 +39,11 @@ export class ClaimModal extends Modal {
 
 	// LLM-related
 	private llmMetadataEl: HTMLElement | null = null;
+
+	// Loading state
+	private isExtracting = false;
+	private extractionTimeout: NodeJS.Timeout | null = null;
+	private loadingIndicatorEl: HTMLElement | null = null;
 
 	constructor(
 		app: App,
@@ -107,6 +113,9 @@ export class ClaimModal extends Modal {
 	onClose() {
 		const { contentEl } = this;
 		contentEl.empty();
+
+		// Clear loading indicator
+		this.hideLoadingIndicator();
 
 		// Cleanup search components
 		if (this.subjectSearch) {
@@ -544,14 +553,98 @@ export class ClaimModal extends Modal {
 	}
 
 	/**
+	 * Render loading indicator for extraction
+	 */
+	private renderLoadingIndicator(type: 'llm' | 'regex' = 'llm'): void {
+		// Clear existing indicator
+		if (this.loadingIndicatorEl) {
+			this.loadingIndicatorEl.remove();
+		}
+
+		// Insert loading indicator after original text
+		const loadingDiv = document.createElement('div');
+		loadingDiv.className = 'claim-extraction-loading';
+
+		this.loadingIndicatorEl = this.originalTextEl.insertAdjacentElement(
+			'afterend',
+			loadingDiv
+		) as HTMLElement;
+
+		// Now add content to the positioned element
+		this.loadingIndicatorEl.createSpan({
+			cls: 'loading-spinner',
+			attr: {
+				role: 'status',
+				'aria-label': 'Loading',
+			},
+		});
+
+		const text =
+			type === 'llm'
+				? '✨ AI analyzing your claim...'
+				: '🔍 Analyzing text patterns...';
+
+		this.loadingIndicatorEl.createSpan({
+			text: text,
+			cls: 'loading-text',
+			attr: {
+				'aria-live': 'polite',
+			},
+		});
+	}
+
+	/**
+	 * Hide loading indicator
+	 */
+	private hideLoadingIndicator(): void {
+		if (this.loadingIndicatorEl) {
+			this.loadingIndicatorEl.remove();
+			this.loadingIndicatorEl = null;
+		}
+
+		if (this.extractionTimeout) {
+			clearTimeout(this.extractionTimeout);
+			this.extractionTimeout = null;
+		}
+
+		this.isExtracting = false;
+	}
+
+	/**
 	 * Auto-extract triple from text
 	 */
 	private async autoExtract(): Promise<void> {
+		// Prevent duplicate extractions
+		if (this.isExtracting) {
+			return;
+		}
+
+		this.isExtracting = true;
+
+		// Determine if LLM will be used
+		const willUseLLM =
+			this.plugin.settings.llm.enabled &&
+			this.plugin.llmService.isAvailable();
+
+		// Show loading indicator
+		this.renderLoadingIndicator(willUseLLM ? 'llm' : 'regex');
+
+		// Set timeout to hide indicator if extraction takes too long
+		this.extractionTimeout = setTimeout(() => {
+			this.hideLoadingIndicator();
+			this.plugin.noticeManager.warning(
+				'Extraction is taking longer than expected'
+			);
+		}, ClaimModal.EXTRACTION_TIMEOUT_MS);
+
 		try {
 			const suggestion =
 				await this.plugin.claimParserService.extractTriple(
 					this.selectedText
 				);
+
+			// Hide loading BEFORE showing results
+			this.hideLoadingIndicator();
 
 			if (
 				!suggestion ||
@@ -577,6 +670,7 @@ export class ClaimModal extends Modal {
 			}
 		} catch (error) {
 			console.debug('Auto-extraction failed:', error);
+			this.hideLoadingIndicator();
 		}
 	}
 
