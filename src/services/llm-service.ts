@@ -675,6 +675,34 @@ export class LLMService extends BaseService {
 	}
 
 	/**
+	 * Get current usage statistics
+	 * Returns a copy to prevent external modification
+	 */
+	getUsageStats(): {
+		totalSpent: number;
+		requestCount: number;
+		totalInputTokens: number;
+		totalOutputTokens: number;
+		requestsByModel: Record<string, {
+			requests: number;
+			inputTokens: number;
+			outputTokens: number;
+			costUSD: number;
+		}>;
+		lastReset: number;
+	} {
+		const stats = this.plugin.settings.llm.usageStats;
+		return {
+			totalSpent: stats.totalCostUSD,
+			requestCount: stats.totalRequests,
+			totalInputTokens: stats.totalInputTokens,
+			totalOutputTokens: stats.totalOutputTokens,
+			requestsByModel: structuredClone(stats.requestsByModel),
+			lastReset: stats.lastReset,
+		};
+	}
+
+	/**
 	 * Extract claims from text using LLM
 	 * Returns array of extracted claims (empty on failure)
 	 */
@@ -682,12 +710,6 @@ export class LLMService extends BaseService {
 		text: string,
 		context?: string
 	): Promise<import('../types/llm').ExtractedClaimLLM[]> {
-		console.debug('[LLM Service] extractClaims called:', {
-			textLength: text.length,
-			hasContext: !!context,
-			isAvailable: this.isAvailable(),
-		});
-
 		if (!this.isAvailable()) {
 			throw new PluginError(
 				LLM_ERRORS.NO_API_KEY,
@@ -711,14 +733,11 @@ export class LLMService extends BaseService {
 		const expectedOutputTokens = 400;
 		const estimate = this.estimateCost(sanitized, expectedOutputTokens);
 
-		console.debug('[LLM Service] Cost estimate:', estimate);
-
 		// Check budget (may show modal)
 		const shouldProceed = await this.checkBudgetWithModal(estimate.estimatedCostUSD);
 
 		if (!shouldProceed) {
 			// User cancelled - return empty to trigger regex fallback
-			console.debug('LLM extraction cancelled due to budget');
 			return [];
 		}
 
@@ -729,7 +748,6 @@ export class LLMService extends BaseService {
 					sanitized,
 					context
 				);
-				console.debug('[LLM Service] Prompt built, calling LLM...');
 
 				const result = await this.callLLM(prompt);
 
@@ -741,15 +759,8 @@ export class LLMService extends BaseService {
 					usage.completionTokens
 				);
 
-				console.debug('[LLM Service] Claims extracted successfully:', result.object.claims.length);
 				return result.object.claims;
 			} catch (error) {
-				console.error('[LLM Service] LLM claim extraction failed:', {
-					error,
-					errorType: error?.constructor?.name,
-					errorMessage: error instanceof Error ? error.message : String(error),
-					stack: error instanceof Error ? error.stack : undefined,
-				});
 				return []; // Return empty array to trigger fallback
 			}
 		});
@@ -800,16 +811,6 @@ Return all valid claims found in the text.`;
 
 		const provider = this.plugin.settings.llm.provider;
 		const modelId = this.plugin.settings.llm.modelId;
-		const customBaseUrl = this.plugin.settings.llm.customBaseUrl;
-
-		console.debug('[LLM Service] Calling LLM:', {
-			provider,
-			modelId,
-			customBaseUrl,
-			promptLength: prompt.length,
-			hasClient: !!this.llmClient,
-			hasApiKey: !!this.decryptedApiKey,
-		});
 
 		// Get model function based on provider
 		let model;
@@ -832,30 +833,13 @@ Return all valid claims found in the text.`;
 				);
 		}
 
-		console.debug('[LLM Service] Model created, calling generateObject...');
+		const result = await generateObject({
+			model,
+			schema: ClaimExtractionSchema,
+			prompt,
+		});
 
-		try {
-			const result = await generateObject({
-				model,
-				schema: ClaimExtractionSchema,
-				prompt,
-			});
-
-			console.debug('[LLM Service] Response received:', {
-				claimsCount: result.object?.claims?.length || 0,
-				usage: result.usage,
-			});
-
-			return result;
-		} catch (error) {
-			console.error('[LLM Service] generateObject failed:', {
-				error,
-				errorType: error?.constructor?.name,
-				errorMessage: error instanceof Error ? error.message : String(error),
-				stack: error instanceof Error ? error.stack : undefined,
-			});
-			throw error;
-		}
+		return result;
 	}
 
 }

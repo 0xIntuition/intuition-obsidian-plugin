@@ -1,5 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import * as path from 'path';
+import { config as loadDotenv } from 'dotenv';
+
+// Load .env file for integration tests
+loadDotenv();
 
 /**
  * Vitest configuration for integration tests

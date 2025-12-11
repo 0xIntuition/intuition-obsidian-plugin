@@ -178,7 +178,7 @@ export const ExtractedClaimLLMSchema = z.object({
 	originalSentence: z.string(),
 	confidence: z.number().min(0).max(1),
 	reasoning: z.string(),
-	suggestedImprovement: z.string().optional(),
+	suggestedImprovement: z.string().nullable().optional(),
 	warnings: z.array(z.string()).optional(),
 });
 
