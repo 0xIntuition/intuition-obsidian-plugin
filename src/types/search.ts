@@ -13,6 +13,11 @@ export interface AtomReference {
 	label: string;
 	atom?: AtomData; // Full atom data if existing
 	confidence: number; // Search relevance score (0-1)
+
+	// Entity disambiguation
+	entityType?: 'person' | 'organization' | 'concept' | 'thing' | 'place' | 'event' | 'unknown';
+	disambiguation?: string; // Human-readable clarification
+	entityConfidence?: number; // 0-1, how confident this is the right entity
 }
 
 /**

@@ -31,6 +31,13 @@ export class AtomSearchInput {
 	private searchAbortController: AbortController | null = null;
 	private currentSearchId = 0;
 
+	// Entity hint from LLM (if available)
+	private entityHint: {
+		type?: string;
+		disambiguation?: string;
+		confidence?: number;
+	} | null = null;
+
 	constructor(
 		parent: HTMLElement,
 		intuitionService: IntuitionService,
@@ -228,6 +235,9 @@ export class AtomSearchInput {
 				type: 'new',
 				label: this.state.query,
 				confidence: 1,
+				entityType: this.entityHint?.type as any,
+				disambiguation: this.entityHint?.disambiguation,
+				entityConfidence: this.entityHint?.confidence,
 			});
 		} else if (this.state.results[this.state.selectedIndex]) {
 			const atom = this.state.results[this.state.selectedIndex];
@@ -237,6 +247,9 @@ export class AtomSearchInput {
 				label: atom.label,
 				atom,
 				confidence: 1,
+				entityType: this.entityHint?.type as any,
+				disambiguation: this.entityHint?.disambiguation,
+				entityConfidence: this.entityHint?.confidence,
 			});
 		}
 	}
@@ -271,10 +284,12 @@ export class AtomSearchInput {
 
 		// Results
 		this.state.results.forEach((atom, index) => {
+			const isLLMSuggestion = this.isLLMSuggestion(atom);
+
 			const item = this.dropdownEl.createDiv({
 				cls: `intuition-atom-suggestion ${
 					index === this.state.selectedIndex ? 'selected' : ''
-				}`,
+				} ${isLLMSuggestion ? 'llm-suggested' : ''}`,
 			});
 			item.setAttribute('role', 'option');
 			item.setAttribute(
@@ -282,20 +297,38 @@ export class AtomSearchInput {
 				(index === this.state.selectedIndex).toString()
 			);
 
+			// LLM suggestion badge
+			if (isLLMSuggestion) {
+				item.createSpan({
+					cls: 'llm-suggestion-badge',
+					text: '🤖 AI suggests',
+				});
+			}
+
 			// Icon/Emoji/Image
 			this.renderAtomImage(item, atom, 'suggestion-icon');
 
 			// Label
 			item.createSpan({ cls: 'suggestion-label', text: atom.label });
 
+			// Entity type badge (from LLM hint or GraphQL)
+			const entityType = this.getEntityType(atom);
+			if (entityType) {
+				item.createSpan({
+					cls: 'entity-type-badge',
+					text: entityType,
+				});
+			}
+
 			// Type badge
 			item.createSpan({ cls: 'suggestion-type', text: atom.type });
 
-			// Description (if available from semantic search)
-			if (atom.description) {
+			// Description (if available from semantic search) or disambiguation
+			const description = atom.description || this.entityHint?.disambiguation;
+			if (description) {
 				item.createDiv({
-					cls: 'suggestion-description',
-					text: atom.description,
+					cls: description === this.entityHint?.disambiguation ? 'entity-disambiguation' : 'suggestion-description',
+					text: description,
 				});
 			}
 
@@ -313,6 +346,9 @@ export class AtomSearchInput {
 					label: atom.label,
 					atom,
 					confidence: 1,
+					entityType: this.entityHint?.type as any,
+					disambiguation: this.entityHint?.disambiguation,
+					entityConfidence: this.entityHint?.confidence,
 				});
 			});
 		});
@@ -491,6 +527,9 @@ export class AtomSearchInput {
 				label: atom.label,
 				atom,
 				confidence: 1,
+				entityType: this.entityHint?.type as any,
+				disambiguation: this.entityHint?.disambiguation,
+				entityConfidence: this.entityHint?.confidence,
 			});
 		} else if (this.config.allowCreate) {
 			// No existing atom, create new one
@@ -498,6 +537,9 @@ export class AtomSearchInput {
 				type: 'new',
 				label: label,
 				confidence: 1,
+				entityType: this.entityHint?.type as any,
+				disambiguation: this.entityHint?.disambiguation,
+				entityConfidence: this.entityHint?.confidence,
 			});
 		}
 	}
@@ -515,6 +557,51 @@ export class AtomSearchInput {
 	 */
 	getValue(): string {
 		return this.inputEl.value;
+	}
+
+	/**
+	 * Set entity type hint from LLM extraction
+	 * This helps prioritize search results
+	 */
+	setEntityHint(hint: { type?: string; disambiguation?: string; confidence?: number }): void {
+		this.entityHint = hint;
+	}
+
+	/**
+	 * Check if atom matches LLM's suggested entity
+	 */
+	private isLLMSuggestion(atom: AtomData): boolean {
+		if (!this.entityHint) return false;
+
+		// Match by label similarity and type
+		const labelMatch = atom.label.toLowerCase() === this.inputEl.value.toLowerCase();
+		const typeMatch = !!(this.entityHint.type && atom.type === this.entityHint.type);
+
+		return labelMatch && typeMatch;
+	}
+
+	/**
+	 * Get entity type display string
+	 */
+	private getEntityType(atom: AtomData): string | null {
+		// Prefer LLM hint if available
+		if (this.entityHint?.type) {
+			return this.capitalizeFirst(this.entityHint.type);
+		}
+
+		// Fallback to GraphQL type if available
+		if (atom.type) {
+			return this.capitalizeFirst(atom.type);
+		}
+
+		return null;
+	}
+
+	/**
+	 * Capitalize first letter of string
+	 */
+	private capitalizeFirst(str: string): string {
+		return str.charAt(0).toUpperCase() + str.slice(1);
 	}
 
 	/**

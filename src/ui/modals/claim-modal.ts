@@ -38,6 +38,11 @@ export class ClaimModal extends Modal {
 	private submitButton: HTMLButtonElement;
 	private cancelButton: HTMLButtonElement;
 
+	// Entity badges
+	private subjectBadgeEl: HTMLElement | null = null;
+	private predicateBadgeEl: HTMLElement | null = null;
+	private objectBadgeEl: HTMLElement | null = null;
+
 	// LLM-related
 	private llmMetadataEl: HTMLElement | null = null;
 
@@ -177,12 +182,17 @@ export class ClaimModal extends Modal {
 		const subjectField = this.tripleInputsEl.createDiv({
 			cls: 'claim-field',
 		});
-		subjectField.createEl('label', { text: 'Subject' });
+		const subjectLabelRow = subjectField.createDiv({ cls: 'field-label-row' });
+		subjectLabelRow.createEl('label', { text: 'Subject' });
+		this.subjectBadgeEl = subjectLabelRow.createSpan({ cls: 'entity-badge' });
 		const subjectContainer = subjectField.createDiv();
 		this.subjectSearch = new AtomSearchInput(
 			subjectContainer,
 			this.plugin.intuitionService,
-			(ref) => this.handleAtomSelection('subject', ref),
+			(ref) => {
+				this.handleAtomSelection('subject', ref);
+				this.updateEntityBadge('subject', ref);
+			},
 			{ placeholder: 'Search or create subject...', allowCreate: true }
 		);
 
@@ -190,12 +200,17 @@ export class ClaimModal extends Modal {
 		const predicateField = this.tripleInputsEl.createDiv({
 			cls: 'claim-field predicate-field',
 		});
-		predicateField.createEl('label', { text: 'Predicate' });
+		const predicateLabelRow = predicateField.createDiv({ cls: 'field-label-row' });
+		predicateLabelRow.createEl('label', { text: 'Predicate' });
+		this.predicateBadgeEl = predicateLabelRow.createSpan({ cls: 'entity-badge' });
 		const predicateContainer = predicateField.createDiv();
 		this.predicateSearch = new AtomSearchInput(
 			predicateContainer,
 			this.plugin.intuitionService,
-			(ref) => this.handleAtomSelection('predicate', ref),
+			(ref) => {
+				this.handleAtomSelection('predicate', ref);
+				this.updateEntityBadge('predicate', ref);
+			},
 			{
 				placeholder: 'Search or create predicate...',
 				allowCreate: true,
@@ -206,12 +221,17 @@ export class ClaimModal extends Modal {
 		const objectField = this.tripleInputsEl.createDiv({
 			cls: 'claim-field',
 		});
-		objectField.createEl('label', { text: 'Object' });
+		const objectLabelRow = objectField.createDiv({ cls: 'field-label-row' });
+		objectLabelRow.createEl('label', { text: 'Object' });
+		this.objectBadgeEl = objectLabelRow.createSpan({ cls: 'entity-badge' });
 		const objectContainer = objectField.createDiv();
 		this.objectSearch = new AtomSearchInput(
 			objectContainer,
 			this.plugin.intuitionService,
-			(ref) => this.handleAtomSelection('object', ref),
+			(ref) => {
+				this.handleAtomSelection('object', ref);
+				this.updateEntityBadge('object', ref);
+			},
 			{ placeholder: 'Search or create object...', allowCreate: true }
 		);
 	}
@@ -668,8 +688,9 @@ export class ClaimModal extends Modal {
 				`${source} Suggestion (${confidencePercent}% confidence): ${suggestion.subject} → ${suggestion.predicate} → ${suggestion.object}`
 			);
 
-			// If LLM-powered, show enhanced UI
+			// If LLM-powered, show enhanced UI and set entity hints
 			if (suggestion.pattern === 'llm' && suggestion.llmMetadata) {
+				this.setEntityHintsFromLLM(suggestion);
 				this.renderLLMMetadata(suggestion);
 			}
 		} catch (error) {
@@ -914,6 +935,32 @@ export class ClaimModal extends Modal {
 	}
 
 	/**
+	 * Set entity hints from LLM metadata
+	 */
+	private setEntityHintsFromLLM(suggestion: TripleSuggestion): void {
+		if (!suggestion.llmMetadata) return;
+
+		const metadata = suggestion.llmMetadata;
+
+		// Set hints for subject
+		this.subjectSearch.setEntityHint({
+			type: metadata.subjectType,
+			disambiguation: metadata.subjectDisambiguation,
+			confidence: metadata.subjectConfidence,
+		});
+
+		// Set hints for object
+		this.objectSearch.setEntityHint({
+			type: metadata.objectType,
+			disambiguation: metadata.objectDisambiguation,
+			confidence: metadata.objectConfidence,
+		});
+
+		// Note: Predicates don't typically have entity types in the same way,
+		// but we could potentially use the predicate alternatives if needed
+	}
+
+	/**
 	 * Render LLM confidence and metadata UI
 	 */
 	private renderLLMMetadata(suggestion: TripleSuggestion): void {
@@ -1008,6 +1055,69 @@ export class ClaimModal extends Modal {
 		if (metadata.predicateAlternatives && metadata.predicateAlternatives.length > 0) {
 			this.renderPredicateAlternatives(metadata.predicateAlternatives);
 		}
+	}
+
+	/**
+	 * Update entity type badge after selection
+	 */
+	private updateEntityBadge(
+		field: 'subject' | 'predicate' | 'object',
+		ref: AtomReference | null
+	): void {
+		const badgeEl = this.getBadgeElement(field);
+		if (!badgeEl) return;
+
+		badgeEl.empty();
+
+		if (!ref || !ref.entityType) return;
+
+		// Create badge with type and confidence
+		const type = this.capitalizeFirst(ref.entityType);
+		const confidence = ref.entityConfidence ? Math.round(ref.entityConfidence * 100) : null;
+
+		const badgeText = confidence
+			? `${type} ${confidence}%`
+			: type;
+
+		badgeEl.setText(badgeText);
+		badgeEl.addClass('entity-badge-visible');
+
+		// Color-code by confidence
+		if (confidence) {
+			// Remove existing confidence classes
+			badgeEl.removeClass('high-confidence', 'medium-confidence', 'low-confidence');
+
+			if (confidence >= 80) {
+				badgeEl.addClass('high-confidence');
+			} else if (confidence >= 50) {
+				badgeEl.addClass('medium-confidence');
+			} else {
+				badgeEl.addClass('low-confidence');
+			}
+		}
+
+		// Add tooltip with disambiguation
+		if (ref.disambiguation) {
+			badgeEl.setAttribute('aria-label', ref.disambiguation);
+			badgeEl.setAttribute('title', ref.disambiguation);
+		}
+	}
+
+	/**
+	 * Get badge element for field
+	 */
+	private getBadgeElement(field: 'subject' | 'predicate' | 'object'): HTMLElement | null {
+		if (field === 'subject') return this.subjectBadgeEl;
+		if (field === 'predicate') return this.predicateBadgeEl;
+		if (field === 'object') return this.objectBadgeEl;
+		return null;
+	}
+
+	/**
+	 * Capitalize first letter of string
+	 */
+	private capitalizeFirst(str: string): string {
+		return str.charAt(0).toUpperCase() + str.slice(1);
 	}
 
 	/**
