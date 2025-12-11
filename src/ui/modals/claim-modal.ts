@@ -15,6 +15,7 @@ import {
 	TripleSuggestion,
 	UI_CONSTANTS,
 } from '../../types';
+import { capitalizeFirst } from '../../utils/helpers';
 
 export class ClaimModal extends Modal {
 	private static readonly MIN_AUTO_SUGGESTION_CONFIDENCE = 0.5;
@@ -1072,7 +1073,7 @@ export class ClaimModal extends Modal {
 		if (!ref || !ref.entityType) return;
 
 		// Create badge with type and confidence
-		const type = this.capitalizeFirst(ref.entityType);
+		const type = capitalizeFirst(ref.entityType);
 		const confidence = ref.entityConfidence ? Math.round(ref.entityConfidence * 100) : null;
 
 		const badgeText = confidence
@@ -1111,13 +1112,6 @@ export class ClaimModal extends Modal {
 		if (field === 'predicate') return this.predicateBadgeEl;
 		if (field === 'object') return this.objectBadgeEl;
 		return null;
-	}
-
-	/**
-	 * Capitalize first letter of string
-	 */
-	private capitalizeFirst(str: string): string {
-		return str.charAt(0).toUpperCase() + str.slice(1);
 	}
 
 	/**

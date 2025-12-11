@@ -14,7 +14,7 @@ import {
 import { IntuitionService } from '../../services/intuition-service';
 import { debounce, DebouncedFunction } from '../../utils/debounce';
 import { mergeSearchResults } from '../../utils/search-helpers';
-import { setImageSrc, validateSearchQuery } from '../../utils/helpers';
+import { setImageSrc, validateSearchQuery, capitalizeFirst } from '../../utils/helpers';
 
 export class AtomSearchInput {
 	private container: HTMLElement;
@@ -33,7 +33,7 @@ export class AtomSearchInput {
 
 	// Entity hint from LLM (if available)
 	private entityHint: {
-		type?: string;
+		type?: AtomReference['entityType'];
 		disambiguation?: string;
 		confidence?: number;
 	} | null = null;
@@ -235,7 +235,7 @@ export class AtomSearchInput {
 				type: 'new',
 				label: this.state.query,
 				confidence: 1,
-				entityType: this.entityHint?.type as any,
+				entityType: this.entityHint?.type,
 				disambiguation: this.entityHint?.disambiguation,
 				entityConfidence: this.entityHint?.confidence,
 			});
@@ -247,7 +247,7 @@ export class AtomSearchInput {
 				label: atom.label,
 				atom,
 				confidence: 1,
-				entityType: this.entityHint?.type as any,
+				entityType: this.entityHint?.type,
 				disambiguation: this.entityHint?.disambiguation,
 				entityConfidence: this.entityHint?.confidence,
 			});
@@ -346,7 +346,7 @@ export class AtomSearchInput {
 					label: atom.label,
 					atom,
 					confidence: 1,
-					entityType: this.entityHint?.type as any,
+					entityType: this.entityHint?.type,
 					disambiguation: this.entityHint?.disambiguation,
 					entityConfidence: this.entityHint?.confidence,
 				});
@@ -491,6 +491,7 @@ export class AtomSearchInput {
 			selectedIndex: 0,
 			error: null,
 		};
+		this.entityHint = null; // Clear entity hint
 		this.previewEl.style.display = 'none';
 		this.inputEl.style.display = 'block';
 		this.inputEl.focus();
@@ -527,7 +528,7 @@ export class AtomSearchInput {
 				label: atom.label,
 				atom,
 				confidence: 1,
-				entityType: this.entityHint?.type as any,
+				entityType: this.entityHint?.type,
 				disambiguation: this.entityHint?.disambiguation,
 				entityConfidence: this.entityHint?.confidence,
 			});
@@ -537,7 +538,7 @@ export class AtomSearchInput {
 				type: 'new',
 				label: label,
 				confidence: 1,
-				entityType: this.entityHint?.type as any,
+				entityType: this.entityHint?.type,
 				disambiguation: this.entityHint?.disambiguation,
 				entityConfidence: this.entityHint?.confidence,
 			});
@@ -563,7 +564,7 @@ export class AtomSearchInput {
 	 * Set entity type hint from LLM extraction
 	 * This helps prioritize search results
 	 */
-	setEntityHint(hint: { type?: string; disambiguation?: string; confidence?: number }): void {
+	setEntityHint(hint: { type?: AtomReference['entityType']; disambiguation?: string; confidence?: number }): void {
 		this.entityHint = hint;
 	}
 
@@ -573,11 +574,15 @@ export class AtomSearchInput {
 	private isLLMSuggestion(atom: AtomData): boolean {
 		if (!this.entityHint) return false;
 
-		// Match by label similarity and type
+		// Match by label similarity
 		const labelMatch = atom.label.toLowerCase() === this.inputEl.value.toLowerCase();
-		const typeMatch = !!(this.entityHint.type && atom.type === this.entityHint.type);
 
-		return labelMatch && typeMatch;
+		// If no entity type hint, match by label only
+		if (!this.entityHint.type) return labelMatch;
+
+		// If type hint exists, prefer exact type match but fallback to label match if atom has no type
+		const typeMatch = atom.type?.toLowerCase() === this.entityHint.type.toLowerCase();
+		return labelMatch && (typeMatch || !atom.type);
 	}
 
 	/**
@@ -586,22 +591,15 @@ export class AtomSearchInput {
 	private getEntityType(atom: AtomData): string | null {
 		// Prefer LLM hint if available
 		if (this.entityHint?.type) {
-			return this.capitalizeFirst(this.entityHint.type);
+			return capitalizeFirst(this.entityHint.type);
 		}
 
 		// Fallback to GraphQL type if available
 		if (atom.type) {
-			return this.capitalizeFirst(atom.type);
+			return capitalizeFirst(atom.type);
 		}
 
 		return null;
-	}
-
-	/**
-	 * Capitalize first letter of string
-	 */
-	private capitalizeFirst(str: string): string {
-		return str.charAt(0).toUpperCase() + str.slice(1);
 	}
 
 	/**

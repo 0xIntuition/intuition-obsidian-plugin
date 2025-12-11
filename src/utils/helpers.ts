@@ -196,3 +196,20 @@ export function validateSearchQuery(
 
 	return trimmed;
 }
+
+/**
+ * Capitalizes the first letter of a string.
+ * Used for formatting entity types and other display strings.
+ *
+ * @param str - String to capitalize
+ * @returns String with first letter capitalized
+ *
+ * @example
+ * capitalizeFirst('person') // 'Person'
+ * capitalizeFirst('organization') // 'Organization'
+ * capitalizeFirst('') // ''
+ */
+export function capitalizeFirst(str: string): string {
+	if (!str || str.length === 0) return str;
+	return str.charAt(0).toUpperCase() + str.slice(1);
+}
