@@ -6,6 +6,7 @@
 // UI Display Constants
 export const UI_CONSTANTS = {
 	ADDRESS_TRUNCATE_LENGTH: 6,
+	MAX_PREDICATE_ALTERNATIVES: 5,
 
 	NETWORK_NAMES: {
 		testnet: 'Testnet (recommended for testing)',

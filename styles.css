@@ -810,6 +810,63 @@
 	margin-top: 20px;
 }
 
+/* Predicate Alternatives Pills */
+.predicate-alternatives {
+	margin-top: 8px;
+	padding: 8px 0;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.alternatives-label {
+	font-size: 13px;
+	color: var(--text-muted);
+	font-weight: 500;
+}
+
+.alternatives-pills {
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+.predicate-pill {
+	padding: 4px 12px;
+	font-size: 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 12px;
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.predicate-pill:hover {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-color: var(--interactive-accent);
+	transform: translateY(-1px);
+}
+
+.predicate-pill:active {
+	transform: translateY(0);
+}
+
+.predicate-pill.is-selected {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-color: var(--interactive-accent);
+	font-weight: 500;
+}
+
+.alternatives-more {
+	font-size: 12px;
+	color: var(--text-muted);
+	font-style: italic;
+}
+
 /* Animations */
 @keyframes pulse {
 	0%, 100% {

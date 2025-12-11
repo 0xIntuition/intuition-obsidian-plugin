@@ -13,6 +13,7 @@ import {
 	AtomReference,
 	TripleData,
 	TripleSuggestion,
+	UI_CONSTANTS,
 } from '../../types';
 
 export class ClaimModal extends Modal {
@@ -44,6 +45,9 @@ export class ClaimModal extends Modal {
 	private isExtracting = false;
 	private extractionTimeout: NodeJS.Timeout | null = null;
 	private loadingIndicatorEl: HTMLElement | null = null;
+
+	// Race condition prevention for predicate alternatives
+	private currentAlternativeSelectionId = 0;
 
 	constructor(
 		app: App,
@@ -184,7 +188,7 @@ export class ClaimModal extends Modal {
 
 		// Predicate field
 		const predicateField = this.tripleInputsEl.createDiv({
-			cls: 'claim-field',
+			cls: 'claim-field predicate-field',
 		});
 		predicateField.createEl('label', { text: 'Predicate' });
 		const predicateContainer = predicateField.createDiv();
@@ -811,6 +815,105 @@ export class ClaimModal extends Modal {
 	}
 
 	/**
+	 * Render predicate alternatives as clickable pills
+	 */
+	private renderPredicateAlternatives(alternatives: string[]): void {
+		// Clear existing alternatives
+		const existingAlts = this.tripleInputsEl.querySelector('.predicate-alternatives');
+		if (existingAlts) {
+			existingAlts.remove();
+		}
+
+		// Only show if we have alternatives
+		if (!alternatives || alternatives.length === 0) {
+			return;
+		}
+
+		// Find the predicate field container
+		const predicateField = this.tripleInputsEl.querySelector('.claim-field.predicate-field');
+		if (!predicateField) return;
+
+		// Create alternatives container
+		const altContainer = predicateField.createDiv({
+			cls: 'predicate-alternatives'
+		});
+
+		altContainer.createSpan({
+			text: 'Alternatives: ',
+			cls: 'alternatives-label'
+		});
+
+		const pillsContainer = altContainer.createDiv({
+			cls: 'alternatives-pills'
+		});
+
+		// Limit to max alternatives
+		const maxAlternatives = UI_CONSTANTS.MAX_PREDICATE_ALTERNATIVES;
+		const displayAlternatives = alternatives.slice(0, maxAlternatives);
+
+		// Render each alternative as a pill
+		displayAlternatives.forEach(alt => {
+			const pill = pillsContainer.createEl('button', {
+				text: alt,
+				cls: 'predicate-pill',
+				attr: {
+					type: 'button',
+					'aria-label': `Select alternative predicate ${alt}`,
+					title: `Select predicate: ${alt}`
+				}
+			});
+
+			// Highlight if this is the current predicate
+			if (this.draft.predicate?.label === alt) {
+				pill.addClass('is-selected');
+			}
+
+			pill.addEventListener('click', () => {
+				this.selectPredicateAlternative(alt);
+			});
+		});
+
+		// Show "more" indicator if truncated
+		if (alternatives.length > maxAlternatives) {
+			altContainer.createSpan({
+				text: `+${alternatives.length - maxAlternatives} more`,
+				cls: 'alternatives-more'
+			});
+		}
+	}
+
+	/**
+	 * Handle clicking a predicate alternative
+	 */
+	private async selectPredicateAlternative(predicate: string): Promise<void> {
+		const selectionId = ++this.currentAlternativeSelectionId;
+		try {
+			// Update predicate field
+			await this.predicateSearch.setValue(predicate);
+
+			// Ignore if a newer selection has started
+			if (selectionId !== this.currentAlternativeSelectionId) return;
+
+			// Trigger validation and existence check
+			this.validateDraft();
+			await this.checkIfClaimExists();
+
+			// Ignore if a newer selection has started
+			if (selectionId !== this.currentAlternativeSelectionId) return;
+
+			// Show feedback after all async operations complete
+			this.plugin.noticeManager.success(`Predicate updated to "${predicate}"`);
+
+		} catch (error) {
+			// Ignore errors from stale selections
+			if (selectionId !== this.currentAlternativeSelectionId) return;
+
+			this.plugin.noticeManager.error('Failed to update predicate');
+			console.error('Predicate alternative error:', error);
+		}
+	}
+
+	/**
 	 * Render LLM confidence and metadata UI
 	 */
 	private renderLLMMetadata(suggestion: TripleSuggestion): void {
@@ -900,6 +1003,11 @@ export class ClaimModal extends Modal {
 		typesEl.setText(
 			`Types: ${metadata.subjectType} → ${metadata.objectType}`
 		);
+
+		// Render predicate alternatives (after all metadata)
+		if (metadata.predicateAlternatives && metadata.predicateAlternatives.length > 0) {
+			this.renderPredicateAlternatives(metadata.predicateAlternatives);
+		}
 	}
 
 	/**

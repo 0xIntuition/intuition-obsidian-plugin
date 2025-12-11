@@ -724,3 +724,233 @@ describe('ClaimModal - Apply Suggestion', () => {
 		});
 	});
 });
+
+describe('ClaimModal - Predicate Alternatives', () => {
+	let modal: ClaimModal;
+	let plugin: IntuitionPlugin;
+
+	beforeEach(() => {
+		const { plugin: testPlugin, app } = createTestPlugin({
+			llm: {
+				enabled: true,
+				provider: 'anthropic',
+				encryptedApiKey: 'test-key',
+			},
+		});
+		plugin = testPlugin as unknown as IntuitionPlugin;
+
+		// Initialize settings
+		plugin.settings = {
+			llm: {
+				enabled: true,
+				provider: 'anthropic',
+				encryptedApiKey: 'test-key',
+			},
+		} as any;
+
+		// Mock services
+		plugin.llmService = {
+			isAvailable: vi.fn(() => true),
+		} as any;
+
+		plugin.claimParserService = {
+			validateClaim: vi.fn(() => ({ warnings: [] })),
+			extractTriple: vi.fn(async () => null),
+		} as any;
+
+		plugin.noticeManager = {
+			info: vi.fn(),
+			success: vi.fn(),
+			error: vi.fn(),
+		} as any;
+
+		plugin.intuitionService = {
+			searchAtoms: vi.fn(async () => []),
+		} as any;
+
+		modal = new ClaimModal(
+			app,
+			plugin,
+			'Bitcoin is a cryptocurrency',
+			'/test/file.md'
+		);
+	});
+
+	afterEach(() => {
+		modal.close();
+	});
+
+	it('should render alternatives as pills when LLM metadata exists', () => {
+		modal.onOpen();
+
+		(modal as any).renderPredicateAlternatives(['represents', 'functions as', 'serves as']);
+
+		const pills = modal.contentEl.querySelectorAll('.predicate-pill');
+		expect(pills.length).toBe(3);
+		expect(pills[0].textContent).toBe('represents');
+		expect(pills[1].textContent).toBe('functions as');
+		expect(pills[2].textContent).toBe('serves as');
+	});
+
+	it('should not render alternatives if none exist', () => {
+		modal.onOpen();
+
+		(modal as any).renderPredicateAlternatives([]);
+
+		const pills = modal.contentEl.querySelectorAll('.predicate-pill');
+		expect(pills.length).toBe(0);
+	});
+
+	it('should not render alternatives if null', () => {
+		modal.onOpen();
+
+		(modal as any).renderPredicateAlternatives(null);
+
+		const pills = modal.contentEl.querySelectorAll('.predicate-pill');
+		expect(pills.length).toBe(0);
+	});
+
+	it('should limit to 5 alternatives', () => {
+		modal.onOpen();
+
+		(modal as any).renderPredicateAlternatives(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']);
+
+		const pills = modal.contentEl.querySelectorAll('.predicate-pill');
+		expect(pills.length).toBe(5);
+
+		const moreText = modal.contentEl.querySelector('.alternatives-more');
+		expect(moreText?.textContent).toContain('+5 more');
+	});
+
+	it('should not show "more" indicator if 5 or fewer alternatives', () => {
+		modal.onOpen();
+
+		(modal as any).renderPredicateAlternatives(['a', 'b', 'c']);
+
+		const moreText = modal.contentEl.querySelector('.alternatives-more');
+		expect(moreText).toBeNull();
+	});
+
+	it('should highlight current predicate as selected', () => {
+		modal.onOpen();
+
+		// Set current predicate
+		(modal as any).draft.predicate = { label: 'created', type: 'new' };
+
+		(modal as any).renderPredicateAlternatives(['developed', 'created', 'built']);
+
+		const pills = modal.contentEl.querySelectorAll('.predicate-pill');
+		expect(pills[0].classList.contains('is-selected')).toBe(false);
+		expect(pills[1].classList.contains('is-selected')).toBe(true);
+		expect(pills[2].classList.contains('is-selected')).toBe(false);
+	});
+
+	it('should update predicate field when pill is clicked', async () => {
+		modal.onOpen();
+
+		// Mock the predicate search setValue
+		const setValueSpy = vi.fn();
+		(modal as any).predicateSearch = {
+			setValue: setValueSpy,
+			destroy: vi.fn(),
+		};
+
+		(modal as any).renderPredicateAlternatives(['developed', 'created', 'built']);
+
+		const pills = modal.contentEl.querySelectorAll('.predicate-pill');
+		(pills[1] as HTMLButtonElement).click();
+
+		await flushPromises();
+
+		expect(setValueSpy).toHaveBeenCalledWith('created');
+	});
+
+	it('should trigger existence check after selecting alternative', async () => {
+		modal.onOpen();
+
+		// Mock necessary methods
+		(modal as any).predicateSearch = {
+			setValue: vi.fn(),
+			destroy: vi.fn(),
+		};
+
+		const checkSpy = vi.fn();
+		(modal as any).checkIfClaimExists = checkSpy;
+		(modal as any).validateDraft = vi.fn();
+
+		(modal as any).renderPredicateAlternatives(['developed']);
+
+		const pill = modal.contentEl.querySelector('.predicate-pill') as HTMLButtonElement;
+		pill.click();
+
+		await flushPromises();
+
+		expect(checkSpy).toHaveBeenCalled();
+	});
+
+	it('should show success notice when predicate is updated', async () => {
+		modal.onOpen();
+
+		(modal as any).predicateSearch = {
+			setValue: vi.fn(),
+			destroy: vi.fn(),
+		};
+		(modal as any).validateDraft = vi.fn();
+		(modal as any).checkIfClaimExists = vi.fn();
+
+		(modal as any).renderPredicateAlternatives(['developed']);
+
+		const pill = modal.contentEl.querySelector('.predicate-pill') as HTMLButtonElement;
+		pill.click();
+
+		await flushPromises();
+
+		expect(plugin.noticeManager.success).toHaveBeenCalledWith('Predicate updated to "developed"');
+	});
+
+	it('should show error notice on failure', async () => {
+		modal.onOpen();
+
+		(modal as any).predicateSearch = {
+			setValue: vi.fn(() => {
+				throw new Error('Update failed');
+			}),
+			destroy: vi.fn(),
+		};
+
+		(modal as any).renderPredicateAlternatives(['developed']);
+
+		const pill = modal.contentEl.querySelector('.predicate-pill') as HTMLButtonElement;
+		pill.click();
+
+		await flushPromises();
+
+		expect(plugin.noticeManager.error).toHaveBeenCalledWith('Failed to update predicate');
+	});
+
+	it('should clear existing alternatives before rendering new ones', () => {
+		modal.onOpen();
+
+		// Render first set
+		(modal as any).renderPredicateAlternatives(['a', 'b']);
+		let pills = modal.contentEl.querySelectorAll('.predicate-pill');
+		expect(pills.length).toBe(2);
+
+		// Render second set
+		(modal as any).renderPredicateAlternatives(['x', 'y', 'z']);
+		pills = modal.contentEl.querySelectorAll('.predicate-pill');
+		expect(pills.length).toBe(3);
+		expect(pills[0].textContent).toBe('x');
+	});
+
+	it('should not render alternatives when LLM metadata has empty array', () => {
+		modal.onOpen();
+
+		// Directly test the renderPredicateAlternatives logic
+		// When called with empty array, it should return early and not render pills
+		(modal as any).renderPredicateAlternatives([]);
+
+		const pills = modal.contentEl.querySelectorAll('.predicate-pill');
+		expect(pills.length).toBe(0);
+	});
+});
