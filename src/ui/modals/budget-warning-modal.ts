@@ -45,6 +45,11 @@ export class BudgetWarningModal extends Modal {
 
 		// Progress bar
 		const progressBar = usageSection.createDiv({ cls: 'budget-progress-bar' });
+		progressBar.setAttribute('role', 'progressbar');
+		progressBar.setAttribute('aria-valuenow', String(Math.min(usagePercentage, 100)));
+		progressBar.setAttribute('aria-valuemin', '0');
+		progressBar.setAttribute('aria-valuemax', '100');
+		progressBar.setAttribute('aria-label', `Budget usage: ${usagePercentage}%`);
 		const progressFill = progressBar.createDiv({ cls: 'budget-progress-fill' });
 		progressFill.style.width = `${Math.min(usagePercentage, 100)}%`;
 
@@ -126,7 +131,16 @@ export class BudgetWarningModal extends Modal {
 	private getResetDate(): Date {
 		const lastReset = this.plugin.settings.llm.usageStats.lastReset;
 		const resetDate = new Date(lastReset);
+
+		// Handle month overflow edge case (e.g., Jan 31 + 1 month should be Feb 28/29, not Mar 3)
+		const originalDay = resetDate.getDate();
 		resetDate.setMonth(resetDate.getMonth() + 1);
+
+		// If day changed due to overflow, set to last day of target month
+		if (resetDate.getDate() !== originalDay) {
+			resetDate.setDate(0); // Set to last day of previous month (target month)
+		}
+
 		return resetDate;
 	}
 

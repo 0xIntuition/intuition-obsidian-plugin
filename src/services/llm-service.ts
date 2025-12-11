@@ -39,7 +39,12 @@ export class LLMService extends BaseService {
 	private lastRequestTime = 0;
 	private requestTimestamps: number[] = [];
 
-	// Session state to track warning dismissal
+	/**
+	 * Session-scoped flag to suppress budget warning modal.
+	 * Set to true when user checks "Don't ask again this session" in BudgetWarningModal.
+	 * Lifecycle: Reset on plugin reload/restart. Persists only for current session.
+	 * Purpose: Prevents repeated warnings after user acknowledges budget threshold.
+	 */
 	public sessionWarningDismissed = false;
 
 	constructor(plugin: IntuitionPlugin) {
@@ -573,7 +578,7 @@ export class LLMService extends BaseService {
 		}
 
 		// Warning at threshold
-		const threshold = costMgmt.warningThresholdPercent;
+		const threshold = costMgmt.warningThresholdPercent ?? 80;
 		if (currentPercentage >= threshold && !this.sessionWarningDismissed) {
 			return new Promise((resolve) => {
 				new BudgetWarningModal(

@@ -1032,6 +1032,12 @@
 	margin-top: 24px;
 }
 
+.budget-actions button:focus,
+.budget-actions button:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
 /* Budget Exceeded Modal */
 .budget-exceeded-usage {
 	font-weight: 600;
