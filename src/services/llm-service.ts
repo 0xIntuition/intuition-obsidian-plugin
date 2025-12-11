@@ -23,6 +23,9 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 // Obsidian fetch adapter for CORS fix
 import { createObsidianFetch } from '../utils/obsidian-fetch';
+// Budget modals
+import { BudgetWarningModal } from '../ui/modals/budget-warning-modal';
+import { BudgetExceededModal } from '../ui/modals/budget-exceeded-modal';
 
 export class LLMService extends BaseService {
 	private cryptoService: CryptoService;
@@ -35,6 +38,14 @@ export class LLMService extends BaseService {
 	private activeRequests = 0;
 	private lastRequestTime = 0;
 	private requestTimestamps: number[] = [];
+
+	/**
+	 * Session-scoped flag to suppress budget warning modal.
+	 * Set to true when user checks "Don't ask again this session" in BudgetWarningModal.
+	 * Lifecycle: Reset on plugin reload/restart. Persists only for current session.
+	 * Purpose: Prevents repeated warnings after user acknowledges budget threshold.
+	 */
+	public sessionWarningDismissed = false;
 
 	constructor(plugin: IntuitionPlugin) {
 		super(plugin);
@@ -540,6 +551,53 @@ export class LLMService extends BaseService {
 	}
 
 	/**
+	 * Check budget before making LLM request
+	 * Shows modal if approaching/exceeded
+	 * Returns true if should proceed, false if cancelled
+	 */
+	async checkBudgetWithModal(estimatedCost: number): Promise<boolean> {
+		const costMgmt = this.plugin.settings.llm.costManagement;
+
+		// If tracking not enabled or no budget set, allow all requests
+		if (!costMgmt.trackUsage || !costMgmt.monthlyBudgetUSD) {
+			return true;
+		}
+
+		const usage = this.plugin.settings.llm.usageStats;
+		const budget = costMgmt.monthlyBudgetUSD;
+
+		const currentUsage = usage.totalCostUSD;
+		const currentPercentage = (currentUsage / budget) * 100;
+
+		// Hard block at 100%
+		if (currentPercentage >= 100) {
+			return new Promise((resolve) => {
+				new BudgetExceededModal(this.plugin.app, this.plugin).open();
+				resolve(false); // Block operation
+			});
+		}
+
+		// Warning at threshold
+		const threshold = costMgmt.warningThresholdPercent ?? 80;
+		if (currentPercentage >= threshold && !this.sessionWarningDismissed) {
+			return new Promise((resolve) => {
+				new BudgetWarningModal(
+					this.plugin.app,
+					this.plugin,
+					currentUsage,
+					budget,
+					estimatedCost,
+					() => resolve(true),  // Continue
+					() => resolve(false)  // Cancel
+				).open();
+			});
+		}
+
+		// All good
+		return true;
+	}
+
+	/**
 	 * Track usage after a request
 	 * Used by extractClaims() method (implemented in Plan 006-2b)
 	 */
@@ -655,14 +713,13 @@ export class LLMService extends BaseService {
 
 		console.debug('[LLM Service] Cost estimate:', estimate);
 
-		// Check budget
-		const budgetCheck = this.checkBudget(estimate.estimatedCostUSD);
-		if (!budgetCheck.valid) {
-			throw new PluginError(
-				budgetCheck.errors[0],
-				ErrorCode.LLM_BUDGET_EXCEEDED,
-				true
-			);
+		// Check budget (may show modal)
+		const shouldProceed = await this.checkBudgetWithModal(estimate.estimatedCostUSD);
+
+		if (!shouldProceed) {
+			// User cancelled - return empty to trigger regex fallback
+			console.debug('LLM extraction cancelled due to budget');
+			return [];
 		}
 
 		// Enqueue request (rate limiting)
