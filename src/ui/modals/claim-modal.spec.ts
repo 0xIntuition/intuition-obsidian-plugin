@@ -238,6 +238,9 @@ describe('ClaimModal - Loading States', () => {
 		});
 
 		it('should hide loading indicator on extraction error', async () => {
+			// Suppress expected console.debug output
+			const consoleDebugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+
 			// Make extraction throw error
 			plugin.claimParserService.extractTriple = vi.fn(async () => {
 				throw new Error('Extraction failed');
@@ -256,6 +259,8 @@ describe('ClaimModal - Loading States', () => {
 				},
 				{ timeout: 2000, interval: 50 }
 			);
+
+			consoleDebugSpy.mockRestore();
 		});
 
 		it('should hide loading when low confidence suggestion is returned', async () => {
@@ -676,6 +681,9 @@ describe('ClaimModal - Apply Suggestion', () => {
 		});
 
 		it('should return null when both regex and LLM fail', async () => {
+			// Suppress expected console.debug output
+			const consoleDebugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+
 			plugin.llmService.extractClaims = vi.fn(async () => []);
 
 			const result = await (modal as any).parseSuggestion(
@@ -684,6 +692,7 @@ describe('ClaimModal - Apply Suggestion', () => {
 			);
 
 			expect(result).toBeNull();
+			consoleDebugSpy.mockRestore();
 		});
 
 		it('should return null when LLM is disabled and regex fails', async () => {
@@ -711,6 +720,9 @@ describe('ClaimModal - Apply Suggestion', () => {
 		});
 
 		it('should handle LLM extraction errors gracefully', async () => {
+			// Suppress expected console.debug output
+			const consoleDebugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+
 			plugin.llmService.extractClaims = vi.fn(async () => {
 				throw new Error('LLM API error');
 			});
@@ -721,6 +733,7 @@ describe('ClaimModal - Apply Suggestion', () => {
 			);
 
 			expect(result).toBeNull();
+			consoleDebugSpy.mockRestore();
 		});
 	});
 });
@@ -909,6 +922,9 @@ describe('ClaimModal - Predicate Alternatives', () => {
 	});
 
 	it('should show error notice on failure', async () => {
+		// Suppress expected console.error output
+		const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
 		modal.onOpen();
 
 		(modal as any).predicateSearch = {
@@ -926,6 +942,7 @@ describe('ClaimModal - Predicate Alternatives', () => {
 		await flushPromises();
 
 		expect(plugin.noticeManager.error).toHaveBeenCalledWith('Failed to update predicate');
+		consoleErrorSpy.mockRestore();
 	});
 
 	it('should clear existing alternatives before rendering new ones', () => {

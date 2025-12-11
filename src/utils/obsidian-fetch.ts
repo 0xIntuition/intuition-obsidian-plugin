@@ -18,7 +18,7 @@ import type { RequestUrlParam, RequestUrlResponse } from 'obsidian';
 /**
  * Create a fetch-compatible function that uses Obsidian's requestUrl
  *
- * @param _plugin - The Intuition plugin instance (unused but kept for API compatibility)
+ * @param plugin - The Intuition plugin instance
  * @returns A fetch-compatible function
  *
  * @example
@@ -27,7 +27,7 @@ import type { RequestUrlParam, RequestUrlResponse } from 'obsidian';
  * const client = createAnthropic({ apiKey, fetch: customFetch });
  * ```
  */
-export function createObsidianFetch(_plugin: IntuitionPlugin): typeof fetch {
+export function createObsidianFetch(plugin: IntuitionPlugin): typeof fetch {
 	return async (
 		input: RequestInfo | URL,
 		init?: RequestInit
@@ -35,45 +35,15 @@ export function createObsidianFetch(_plugin: IntuitionPlugin): typeof fetch {
 		try {
 			const { url, params } = await parseRequest(input, init);
 
-			// Debug logging
-			console.debug('[Obsidian Fetch] Request:', {
-				url: params.url,
-				method: params.method,
-				headers: params.headers,
-				bodyLength: params.body ?
-					(typeof params.body === 'string' ? params.body.length : params.body.byteLength)
-					: 0,
-			});
-
-			// Call Obsidian's global requestUrl function
-			// requestUrl is a global function in Obsidian's API, not a method on app
+			// Call Obsidian's requestUrl from app (preferred) or global window (fallback)
+			// This allows for mocking in tests while working in production
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const obsidianResponse = await (window as any).requestUrl(params);
-
-			// Debug logging
-			console.debug('[Obsidian Fetch] Response:', {
-				url: params.url,
-				status: obsidianResponse.status,
-				statusText: obsidianResponse.statusText || 'OK',
-				headers: obsidianResponse.headers,
-				textLength: obsidianResponse.text?.length || 0,
-			});
+			const requestUrlFn = (plugin.app as any)?.requestUrl || (window as any).requestUrl;
+			const obsidianResponse = await requestUrlFn(params);
 
 			// Wrap in fetch-compatible Response
 			return new ObsidianResponse(url, obsidianResponse);
 		} catch (error) {
-			// Enhanced error logging
-			console.error('[Obsidian Fetch] Request failed:', {
-				url: typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url,
-				method: init?.method || 'GET',
-				error: error,
-				errorType: error?.constructor?.name,
-				errorMessage: error instanceof Error ? error.message : String(error),
-				// Log response details if available (for HTTP errors)
-				status: (error as any)?.status,
-				statusText: (error as any)?.statusText,
-			});
-
 			// Map Obsidian errors to fetch errors
 			if (error instanceof TypeError) {
 				throw error; // Already a TypeError

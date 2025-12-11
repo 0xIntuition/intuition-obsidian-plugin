@@ -76,7 +76,7 @@ export interface TripleSuggestion {
 		objectConfidence: number;
 		predicateAlternatives: string[];
 		reasoning: string;
-		suggestedImprovement?: string;
+		suggestedImprovement?: string | null;
 		warnings?: string[];
 	};
 }

@@ -617,6 +617,9 @@ describe('ClaimParserService', () => {
 		});
 
 		it('should fall back to regex when LLM fails', async () => {
+			// Suppress expected console.debug output
+			const consoleDebugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+
 			(mockLLMService.isAvailable as any).mockReturnValue(true);
 			(mockLLMService.extractClaims as any).mockRejectedValue(
 				new Error('API error')
@@ -643,6 +646,7 @@ describe('ClaimParserService', () => {
 			expect(result?.pattern).toBe('is-a');
 			expect(result?.subject).toBe('Einstein');
 			expect(mockLLMService.extractClaims).toHaveBeenCalled();
+			consoleDebugSpy.mockRestore();
 		});
 
 		it('should fall back to regex when LLM returns empty results', async () => {
