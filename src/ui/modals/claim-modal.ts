@@ -13,6 +13,7 @@ import {
 	AtomReference,
 	TripleData,
 	TripleSuggestion,
+	UI_CONSTANTS,
 } from '../../types';
 
 export class ClaimModal extends Modal {
@@ -44,6 +45,9 @@ export class ClaimModal extends Modal {
 	private isExtracting = false;
 	private extractionTimeout: NodeJS.Timeout | null = null;
 	private loadingIndicatorEl: HTMLElement | null = null;
+
+	// Race condition prevention for predicate alternatives
+	private currentAlternativeSelectionId = 0;
 
 	constructor(
 		app: App,
@@ -184,7 +188,7 @@ export class ClaimModal extends Modal {
 
 		// Predicate field
 		const predicateField = this.tripleInputsEl.createDiv({
-			cls: 'claim-field',
+			cls: 'claim-field predicate-field',
 		});
 		predicateField.createEl('label', { text: 'Predicate' });
 		const predicateContainer = predicateField.createDiv();
@@ -826,7 +830,7 @@ export class ClaimModal extends Modal {
 		}
 
 		// Find the predicate field container
-		const predicateField = this.tripleInputsEl.querySelector('.claim-field:nth-child(2)');
+		const predicateField = this.tripleInputsEl.querySelector('.claim-field.predicate-field');
 		if (!predicateField) return;
 
 		// Create alternatives container
@@ -843,15 +847,20 @@ export class ClaimModal extends Modal {
 			cls: 'alternatives-pills'
 		});
 
-		// Limit to 5 alternatives
-		const maxAlternatives = 5;
+		// Limit to max alternatives
+		const maxAlternatives = UI_CONSTANTS.MAX_PREDICATE_ALTERNATIVES;
 		const displayAlternatives = alternatives.slice(0, maxAlternatives);
 
 		// Render each alternative as a pill
 		displayAlternatives.forEach(alt => {
 			const pill = pillsContainer.createEl('button', {
 				text: alt,
-				cls: 'predicate-pill'
+				cls: 'predicate-pill',
+				attr: {
+					type: 'button',
+					'aria-label': `Select alternative predicate ${alt}`,
+					title: `Select predicate: ${alt}`
+				}
 			});
 
 			// Highlight if this is the current predicate
@@ -866,12 +875,10 @@ export class ClaimModal extends Modal {
 
 		// Show "more" indicator if truncated
 		if (alternatives.length > maxAlternatives) {
-			const moreText = altContainer.createSpan({
+			altContainer.createSpan({
 				text: `+${alternatives.length - maxAlternatives} more`,
 				cls: 'alternatives-more'
 			});
-			moreText.style.fontSize = '12px';
-			moreText.style.color = 'var(--text-muted)';
 		}
 	}
 
@@ -879,18 +886,28 @@ export class ClaimModal extends Modal {
 	 * Handle clicking a predicate alternative
 	 */
 	private async selectPredicateAlternative(predicate: string): Promise<void> {
+		const selectionId = ++this.currentAlternativeSelectionId;
 		try {
 			// Update predicate field
 			await this.predicateSearch.setValue(predicate);
+
+			// Ignore if a newer selection has started
+			if (selectionId !== this.currentAlternativeSelectionId) return;
 
 			// Trigger validation and existence check
 			this.validateDraft();
 			await this.checkIfClaimExists();
 
-			// Show feedback
+			// Ignore if a newer selection has started
+			if (selectionId !== this.currentAlternativeSelectionId) return;
+
+			// Show feedback after all async operations complete
 			this.plugin.noticeManager.success(`Predicate updated to "${predicate}"`);
 
 		} catch (error) {
+			// Ignore errors from stale selections
+			if (selectionId !== this.currentAlternativeSelectionId) return;
+
 			this.plugin.noticeManager.error('Failed to update predicate');
 			console.error('Predicate alternative error:', error);
 		}
